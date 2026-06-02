@@ -16,7 +16,10 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Run on everything except static assets and image files
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // Run on everything except static assets, image files, and cron endpoints.
+    // Cron routes do their own Bearer-token auth — letting the Supabase
+    // session middleware run on them would redirect Vercel's scheduled
+    // requests to /auth/login and the job would silently no-op.
+    "/((?!_next/static|_next/image|api/cron|favicon\\.ico|icon\\.png|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
