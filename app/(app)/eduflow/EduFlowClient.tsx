@@ -122,7 +122,7 @@ export function EduFlowClient() {
                   </span>
                 )}
               </div>
-              <div className="text-[11px] text-muted-foreground mb-3 min-h-[28px]">{p.audience}</div>
+              <div className="text-[11px] text-muted-foreground mb-3 min-h-[28px]">{t.eduflow.plans[p.key].audience}</div>
               <div className="text-2xl font-bold text-navy">{fmtMoney(p.monthly)}<span className="text-xs text-muted-foreground font-normal"> {t.eduflow.perMo}</span></div>
               <div className="text-xs text-muted-foreground mb-3">{t.eduflow.setupPrefix}{fmtMoney(p.setup)} {p.enterpriseEditable ? <span className="italic">{t.eduflow.startsAt}</span> : null}</div>
               {p.firstMonthFree && (
@@ -131,7 +131,7 @@ export function EduFlowClient() {
                 </div>
               )}
               <ul className="text-xs text-muted-foreground flex flex-col gap-1 mt-2">
-                {p.features.slice(0, 4).map((f, i) => (
+                {t.eduflow.plans[p.key].features.slice(0, 4).map((f, i) => (
                   <li key={i} className="flex gap-1.5">
                     <Check size={12} className="text-success mt-0.5 shrink-0" />
                     <span>{f}</span>

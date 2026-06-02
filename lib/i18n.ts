@@ -351,8 +351,40 @@ export const T = {
       mostPopular:     "最受欢迎",
       firstMonthFree:  "首月免费",
       perMo:           "/ 月",
-      setupPrefix:     "Setup ",
+      setupPrefix:     "安装费 ",
       startsAt:        "(起价)",
+      plans: {
+        starter: {
+          audience: "≤ 50 学生 · 1 位老板 + 2-3 老师",
+          features: [
+            "8 大核心模块",
+            "家长 Portal",
+            "Hosting + 域名 + SSL",
+            "每日自动备份",
+            "WhatsApp 客服支援",
+          ],
+        },
+        professional: {
+          audience: "50-200 学生 · 4-10 位老师",
+          features: [
+            "Starter 所有功能",
+            "WhatsApp 自动催款",
+            "调课自动群发通知",
+            "最多 2 间分院",
+            "自定义报表 · 优先客服",
+          ],
+        },
+        enterprise: {
+          audience: "200+ 学生 · 多分院 · 想客制",
+          features: [
+            "Professional 所有功能",
+            "无限分院",
+            "白标(您的品牌名)",
+            "客制开发 · 专属经理",
+            "API 整合 · SLA 保证",
+          ],
+        },
+      },
       customerDetails: "客户信息",
       formCustomerName:"客户名称 *",
       formCustomerNamePlaceholder:"补习中心 / 学校名称",
@@ -761,6 +793,38 @@ export const T = {
       perMo:           "/ mo",
       setupPrefix:     "Setup ",
       startsAt:        "(starts at)",
+      plans: {
+        starter: {
+          audience: "≤ 50 students · 1 boss + 2-3 teachers",
+          features: [
+            "8 core modules",
+            "Parent Portal",
+            "Hosting + domain + SSL",
+            "Daily auto-backup",
+            "WhatsApp customer support",
+          ],
+        },
+        professional: {
+          audience: "50-200 students · 4-10 teachers",
+          features: [
+            "Everything in Starter",
+            "WhatsApp auto-billing reminders",
+            "Auto class-change notifications",
+            "Up to 2 branches",
+            "Custom reports · Priority support",
+          ],
+        },
+        enterprise: {
+          audience: "200+ students · multi-branch · custom",
+          features: [
+            "Everything in Professional",
+            "Unlimited branches",
+            "White-label (your own brand)",
+            "Custom development · Dedicated PM",
+            "API integration · SLA guarantee",
+          ],
+        },
+      },
       customerDetails: "Customer details",
       formCustomerName:"Customer name *",
       formCustomerNamePlaceholder:"Tuition centre / school name",
