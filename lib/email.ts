@@ -89,3 +89,76 @@ export async function sendReceiptEmail(opts: {
   if (error) throw new Error(`Resend error: ${error.message}`);
   return data;
 }
+
+// ---- Reminder emails (called by /api/cron/daily-reminders) ----
+
+export async function sendSubscriptionReminder(opts: {
+  to:           string;
+  customer:     string;
+  service:      string;
+  amount:       string;
+  dueDate:      string;       // "12 Jun 2026"
+  daysLabel:    string;       // "Due tomorrow" / "Due in 3 days" / "5 days overdue"
+  bankInfo?:    { name?: string; account?: string; accountNo?: string };
+}) {
+  const resend = client();
+  const bank = opts.bankInfo;
+  const bankLines = bank?.name
+    ? [
+        ``,
+        `Payment details:`,
+        `  Bank:         ${bank.name}`,
+        `  Account name: ${bank.account || ""}`,
+        `  Account no.:  ${bank.accountNo || ""}`,
+      ]
+    : [];
+
+  const { data, error } = await resend.emails.send({
+    from: FROM,
+    to:   opts.to,
+    subject: `Reminder: ${opts.service} — ${opts.daysLabel}`,
+    text: [
+      `Dear ${opts.customer},`,
+      ``,
+      `This is a friendly reminder that your subscription "${opts.service}" (${opts.amount}) ${opts.daysLabel.toLowerCase()} on ${opts.dueDate}.`,
+      ...bankLines,
+      ``,
+      `Reply to this email if you have any questions or need to update your billing.`,
+      ``,
+      `Thank you,`,
+      `OLCC Technology Sdn Bhd`,
+    ].join("\n"),
+  });
+  if (error) throw new Error(`Resend error: ${error.message}`);
+  return data;
+}
+
+export async function sendRecurringDigest(opts: {
+  to:    string;
+  items: Array<{ name: string; payee: string; amount: string; dueDate: string; daysLabel: string }>;
+}) {
+  if (opts.items.length === 0) return null;
+  const resend = client();
+
+  const lines = opts.items.map((it, i) =>
+    `${i + 1}. ${it.name} (${it.payee})  —  ${it.amount}  —  ${it.daysLabel} (${it.dueDate})`,
+  );
+
+  const { data, error } = await resend.emails.send({
+    from: FROM,
+    to:   opts.to,
+    subject: `OLCC Books — ${opts.items.length} payment${opts.items.length === 1 ? "" : "s"} due soon`,
+    text: [
+      `Heads up — the following recurring payments are due soon:`,
+      ``,
+      ...lines,
+      ``,
+      `Mark them paid in OLCC Books after settling:`,
+      `https://olcc-books.vercel.app/recurring`,
+      ``,
+      `(Auto-sent by OLCC Books daily reminder cron.)`,
+    ].join("\n"),
+  });
+  if (error) throw new Error(`Resend error: ${error.message}`);
+  return data;
+}
