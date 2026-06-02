@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * OLCC Books theme — dark navy + gold matching the company logo.
+ * Variables use HSL so Tailwind opacity modifiers (e.g. bg-primary/80) work.
+ */
+@layer base {
+  :root {
+    /* ---- base ---- */
+    --background:          210 25% 97%;    /* #f4f6fa paper */
+    --foreground:          220 30% 16%;    /* #1a2438 ink */
+    --card:                0 0% 100%;      /* #ffffff */
+    --card-foreground:     220 30% 16%;
+    --popover:             0 0% 100%;
+    --popover-foreground:  220 30% 16%;
+
+    /* ---- brand ---- */
+    --primary:             217 65% 17%;    /* #0f2747 navy */
+    --primary-foreground:  0 0% 100%;
+    --primary-light:       217 55% 24%;    /* #1c3a5e */
+    --primary-deep:        217 70% 12%;    /* #0a1c33 */
+
+    --gold:                40 50% 57%;     /* #c8a45c */
+    --gold-light:          40 58% 70%;     /* #e0c585 */
+    --gold-foreground:     217 70% 12%;
+
+    /* ---- semantic ---- */
+    --secondary:           210 25% 97%;
+    --secondary-foreground:217 65% 17%;
+    --muted:               210 20% 94%;
+    --muted-foreground:    220 14% 47%;    /* #6b7689 */
+    --accent:              210 25% 95%;
+    --accent-foreground:   217 65% 17%;
+    --destructive:         8 65% 47%;      /* #c0392b */
+    --destructive-foreground: 0 0% 100%;
+    --success:             148 64% 33%;   /* #1f8a5b */
+    --warning:             45 88% 38%;    /* #b8860b */
+
+    --border:              220 18% 92%;   /* #e6e9ef */
+    --input:               220 18% 92%;
+    --ring:                40 50% 57%;    /* gold focus ring */
+
+    /* ---- charts (Recharts) ---- */
+    --chart-1: 148 64% 33%;   /* income green */
+    --chart-2: 8 65% 47%;     /* expense red */
+    --chart-3: 217 65% 17%;   /* navy */
+    --chart-4: 40 50% 57%;    /* gold */
+    --chart-5: 217 55% 24%;   /* navy light */
+
+    --radius: 0.6rem;
+  }
+
+  /* No dark mode for now — the brand reads cleaner on light only.
+     If you ever add it, mirror the palette here. */
+}
+
+@layer base {
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground; }
+  html { font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, sans-serif; }
+}
+
+/* ---- brand utility classes (use in JSX without resorting to inline styles) ---- */
+@layer utilities {
+  .text-gold        { color: hsl(var(--gold)); }
+  .bg-gold          { background-color: hsl(var(--gold)); }
+  .border-gold      { border-color: hsl(var(--gold)); }
+  .text-navy        { color: hsl(var(--primary)); }
+  .bg-navy          { background-color: hsl(var(--primary)); }
+  .bg-navy-light    { background-color: hsl(var(--primary-light)); }
+  .bg-navy-deep     { background-color: hsl(var(--primary-deep)); }
+  .text-success     { color: hsl(var(--success)); }
+  .bg-success       { background-color: hsl(var(--success)); }
+  .bg-success-soft  { background-color: hsl(var(--success) / 0.12); }
+  .border-l-success { border-left-color: hsl(var(--success)); }
+  .text-danger      { color: hsl(var(--destructive)); }
+  .bg-danger-soft   { background-color: hsl(var(--destructive) / 0.12); }
+  .text-warning     { color: hsl(var(--warning)); }
+  .bg-warning       { background-color: hsl(var(--warning)); }
+  .bg-warning-soft  { background-color: hsl(var(--warning) / 0.14); }
+  .border-l-warning { border-left-color: hsl(var(--warning)); }
+}
