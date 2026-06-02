@@ -10,6 +10,7 @@ import {
   ReceiptText,
   RefreshCw,
   Repeat2,
+  GraduationCap,
   Wallet,
   Settings as SettingsIcon,
 } from "lucide-react";
@@ -18,13 +19,14 @@ import type { Dict } from "@/lib/i18n";
 
 const LOGO_URL = "https://raw.githubusercontent.com/cdcheng94-sudo/olcc-assets-circle-png/main/olcc-logo-circle.png";
 
-const NAV: { href: string; key: keyof Dict["nav"]; Icon: React.ComponentType<{ size?: number }> }[] = [
+const NAV: { href: string; key: keyof Dict["nav"]; Icon: React.ComponentType<{ size?: number }>; gold?: boolean }[] = [
   { href: "/dashboard",     key: "dashboard",     Icon: LayoutDashboard },
   { href: "/transactions",  key: "transactions",  Icon: ArrowLeftRight },
   { href: "/invoices",      key: "invoices",      Icon: FileText },
   { href: "/receipts",      key: "receipts",      Icon: ReceiptText },
   { href: "/recurring",     key: "recurring",     Icon: RefreshCw },
   { href: "/subscriptions", key: "subscriptions", Icon: Repeat2 },
+  { href: "/eduflow",       key: "eduflow",       Icon: GraduationCap, gold: true },
   { href: "/claims",        key: "claims",        Icon: Wallet },
   { href: "/settings",      key: "settings",      Icon: SettingsIcon },
 ];
@@ -58,7 +60,7 @@ export function Sidebar({ userEmail }: { userEmail?: string | null }) {
 
       {/* nav */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto">
-        {NAV.map(({ href, key, Icon }) => {
+        {NAV.map(({ href, key, Icon, gold }) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link
@@ -73,7 +75,7 @@ export function Sidebar({ userEmail }: { userEmail?: string | null }) {
               ].join(" ")}
             >
               <Icon size={18} />
-              <span>{t.nav[key]}</span>
+              <span className={gold && !active ? "text-gold-light/90" : ""}>{t.nav[key]}</span>
             </Link>
           );
         })}
