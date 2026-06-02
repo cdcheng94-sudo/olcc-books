@@ -5,8 +5,9 @@ import { Plus, Pencil, Trash2, CheckCircle2, PauseCircle, PlayCircle, MessageCir
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useLang } from "@/components/LangProvider";
+import { interp } from "@/lib/i18n";
 import { fmtDate, fmtMoney } from "@/lib/format";
-import { daysUntilDue, urgencyFor, daysLabel } from "@/lib/recurring-utils";
+import { daysUntilDue, urgencyFor, localizedDaysLabel } from "@/lib/recurring-utils";
 import type { SubscriptionRow } from "@/lib/types";
 import { deleteSubscription, markSubscriptionPaid, updateSubscription } from "./actions";
 import { SubscriptionFormModal } from "./SubscriptionFormModal";
@@ -36,24 +37,25 @@ export function SubscriptionsClient({ initialRows }: { initialRows: Subscription
   }
 
   function onDelete(row: SubscriptionRow) {
-    if (!confirm(`Delete subscription for "${row.customer_name}"? This cannot be undone.`)) return;
+    if (!confirm(interp(t.subscriptions.confirmDelete, { name: row.customer_name }))) return;
     startTransition(async () => {
       try {
         await deleteSubscription(row.id);
         setRows((prev) => prev.filter((r) => r.id !== row.id));
-      } catch (e) { alert("Delete failed: " + (e as Error).message); }
+      } catch (e) { alert(t.errors.deleteFailed + (e as Error).message); }
     });
   }
 
   function onMarkPaid(row: SubscriptionRow) {
-    if (!confirm(`Mark as paid?\n\nThis records an income transaction (MYR ${row.amount}) and advances the next charge date by ${row.frequency}.`)) return;
+    const freqLabel = row.frequency === "monthly" ? t.common.monthly : row.frequency === "quarterly" ? t.common.quarterly : t.common.yearly;
+    if (!confirm(interp(t.subscriptions.confirmMarkPaid, { amount: fmtMoney(row.amount), freq: freqLabel }))) return;
     startTransition(async () => {
       try {
         const r = await markSubscriptionPaid(row.id);
         setRows((prev) => prev.map((x) => x.id === row.id
           ? { ...x, next_charge_date: r.next_charge_date, last_charged_date: new Date().toISOString().slice(0, 10) }
           : x));
-      } catch (e) { alert("Failed: " + (e as Error).message); }
+      } catch (e) { alert(t.errors.failed + (e as Error).message); }
     });
   }
 
@@ -68,7 +70,7 @@ export function SubscriptionsClient({ initialRows }: { initialRows: Subscription
           remind_days_before: row.remind_days_before, status: newStatus,
         });
         setRows((prev) => prev.map((x) => x.id === row.id ? { ...x, status: newStatus } : x));
-      } catch (e) { alert("Failed: " + (e as Error).message); }
+      } catch (e) { alert(t.errors.failed + (e as Error).message); }
     });
   }
 
@@ -79,7 +81,7 @@ export function SubscriptionsClient({ initialRows }: { initialRows: Subscription
     <div>
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div className="text-sm text-muted-foreground">
-          {activeRows.length} active · {pausedRows.length} paused
+          {interp(t.subscriptions.countLine, { active: activeRows.length, paused: pausedRows.length })}
         </div>
         <Button onClick={openNew} className="bg-navy hover:bg-navy-light text-white">
           <Plus className="w-4 h-4 mr-1" />
@@ -91,12 +93,12 @@ export function SubscriptionsClient({ initialRows }: { initialRows: Subscription
         <table className="w-full text-sm">
           <thead className="bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
-              <th className="text-left px-4 py-3 font-medium">Customer</th>
-              <th className="text-left px-4 py-3 font-medium">Service</th>
-              <th className="text-left px-4 py-3 font-medium w-[110px]">Frequency</th>
-              <th className="text-right px-4 py-3 font-medium w-[130px]">Amount</th>
-              <th className="text-left px-4 py-3 font-medium w-[180px]">Next charge</th>
-              <th className="text-left px-4 py-3 font-medium w-[90px]">Status</th>
+              <th className="text-left px-4 py-3 font-medium">{t.subscriptions.customer}</th>
+              <th className="text-left px-4 py-3 font-medium">{t.subscriptions.service}</th>
+              <th className="text-left px-4 py-3 font-medium w-[110px]">{t.subscriptions.frequency}</th>
+              <th className="text-right px-4 py-3 font-medium w-[130px]">{t.subscriptions.amount}</th>
+              <th className="text-left px-4 py-3 font-medium w-[180px]">{t.subscriptions.nextCharge}</th>
+              <th className="text-left px-4 py-3 font-medium w-[90px]">{t.subscriptions.status}</th>
               <th className="w-[200px]"></th>
             </tr>
           </thead>
@@ -112,7 +114,11 @@ export function SubscriptionsClient({ initialRows }: { initialRows: Subscription
                 u === "urgent"             ? "text-destructive font-semibold" :
                 u === "caution"            ? "text-warning"                  :
                                               "text-success";
-              const reminderMsg = `Hi ${r.customer_name}, this is a friendly reminder that your subscription "${r.service_desc}" (MYR ${r.amount}) is due. Bank transfer details available on request. Thank you!`;
+              const reminderMsg = interp(t.subscriptions.waMessage, {
+                name:    r.customer_name,
+                service: r.service_desc,
+                amount:  fmtMoney(r.amount),
+              });
               return (
                 <tr key={r.id} className="border-t border-border hover:bg-muted/20">
                   <td className="px-4 py-3">
@@ -124,39 +130,39 @@ export function SubscriptionsClient({ initialRows }: { initialRows: Subscription
                   <td className="px-4 py-3 text-right tabular-nums">{fmtMoney(r.amount)}</td>
                   <td className="px-4 py-3">
                     <div>{fmtDate(r.next_charge_date)}</div>
-                    <div className={"text-xs " + dueColor}>{r.status === "active" ? daysLabel(days) : "(paused)"}</div>
+                    <div className={"text-xs " + dueColor}>{r.status === "active" ? localizedDaysLabel(days, t) : t.subscriptions.paused}</div>
                   </td>
                   <td className="px-4 py-3">
                     {r.status === "active"
-                      ? <span className="inline-block px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wide bg-success-soft text-success">Active</span>
-                      : <span className="inline-block px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wide bg-muted text-muted-foreground">Paused</span>}
+                      ? <span className="inline-block px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wide bg-success-soft text-success">{t.status.active}</span>
+                      : <span className="inline-block px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wide bg-muted text-muted-foreground">{t.status.paused}</span>}
                   </td>
                   <td className="px-2 py-3 align-middle">
                     <div className="flex items-center justify-end gap-0.5">
                       {r.status === "active" && r.customer_phone && (
                         <a href={whatsappLink(r.customer_phone, reminderMsg)} target="_blank" rel="noreferrer"
-                           className="p-1.5 hover:bg-success/10 rounded text-muted-foreground hover:text-success" title="WhatsApp reminder">
+                           className="p-1.5 hover:bg-success/10 rounded text-muted-foreground hover:text-success" title={t.subscriptions.tipWhatsApp}>
                           <MessageCircle className="w-4 h-4" />
                         </a>
                       )}
                       {r.status === "active" && r.customer_email && (
                         <a href={`mailto:${r.customer_email}?subject=${encodeURIComponent(`Reminder: ${r.service_desc}`)}&body=${encodeURIComponent(reminderMsg)}`}
-                           className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-navy" title="Email reminder">
+                           className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-navy" title={t.subscriptions.tipEmail}>
                           <Mail className="w-4 h-4" />
                         </a>
                       )}
                       {r.status === "active" && (
-                        <button onClick={() => onMarkPaid(r)} disabled={isPending} className="p-1.5 hover:bg-success/10 rounded text-muted-foreground hover:text-success" title="Mark paid">
+                        <button onClick={() => onMarkPaid(r)} disabled={isPending} className="p-1.5 hover:bg-success/10 rounded text-muted-foreground hover:text-success" title={t.subscriptions.tipMarkPaid}>
                           <CheckCircle2 className="w-4 h-4" />
                         </button>
                       )}
-                      <button onClick={() => onToggleStatus(r)} disabled={isPending} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-navy" title={r.status === "active" ? "Pause" : "Activate"}>
+                      <button onClick={() => onToggleStatus(r)} disabled={isPending} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-navy" title={r.status === "active" ? t.subscriptions.tipPause : t.subscriptions.tipActivate}>
                         {r.status === "active" ? <PauseCircle className="w-4 h-4" /> : <PlayCircle className="w-4 h-4" />}
                       </button>
-                      <button onClick={() => openEdit(r)} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-navy" title="Edit">
+                      <button onClick={() => openEdit(r)} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-navy" title={t.subscriptions.tipEdit}>
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
-                      <button onClick={() => onDelete(r)} disabled={isPending} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-destructive" title="Delete">
+                      <button onClick={() => onDelete(r)} disabled={isPending} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-destructive" title={t.subscriptions.tipDelete}>
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>

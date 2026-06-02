@@ -24,7 +24,10 @@ export function urgencyFor(days: number): Urgency {
   return "comfortable";
 }
 
-/** Human-readable label (English-only for now; bilingual happens client-side). */
+/** Human-readable label, English-only. Used in server-side email
+ *  templates where customers may not speak Chinese. For in-app rendering
+ *  prefer localizedDaysLabel() below.
+ */
 export function daysLabel(days: number): string {
   if (days < 0) {
     const n = Math.abs(days);
@@ -33,6 +36,14 @@ export function daysLabel(days: number): string {
   if (days === 0) return "Due today";
   if (days === 1) return "Due tomorrow";
   return `Due in ${days} days`;
+}
+
+/** i18n version — takes the dict, returns a localized label. */
+export function localizedDaysLabel(days: number, dict: { daysLabel: { overdueSuffix: string; dueToday: string; dueTomorrow: string; dueInPrefix: string; dueInSuffix: string } }): string {
+  if (days < 0)   return `${Math.abs(days)}${dict.daysLabel.overdueSuffix}`;
+  if (days === 0) return dict.daysLabel.dueToday;
+  if (days === 1) return dict.daysLabel.dueTomorrow;
+  return `${dict.daysLabel.dueInPrefix}${days}${dict.daysLabel.dueInSuffix}`;
 }
 
 /** Push a date forward by the given frequency, returning a fresh ISO date. */

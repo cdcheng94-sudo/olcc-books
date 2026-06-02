@@ -5,8 +5,9 @@ import { Plus, Pencil, Trash2, CheckCircle2, PauseCircle, PlayCircle } from "luc
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useLang } from "@/components/LangProvider";
+import { interp } from "@/lib/i18n";
 import { fmtDate, fmtMoney } from "@/lib/format";
-import { daysUntilDue, urgencyFor, daysLabel } from "@/lib/recurring-utils";
+import { daysUntilDue, urgencyFor, localizedDaysLabel } from "@/lib/recurring-utils";
 import type { RecurringRow } from "@/lib/types";
 import { deleteRecurring, markRecurringPaid, updateRecurring } from "./actions";
 import { RecurringFormModal } from "./RecurringFormModal";
@@ -31,22 +32,23 @@ export function RecurringClient({ initialRows }: { initialRows: RecurringRow[] }
   }
 
   function onDelete(row: RecurringRow) {
-    if (!confirm(`Delete "${row.name}"? This cannot be undone.`)) return;
+    if (!confirm(interp(t.recurring.confirmDelete, { name: row.name }))) return;
     startTransition(async () => {
       try {
         await deleteRecurring(row.id);
         setRows((prev) => prev.filter((r) => r.id !== row.id));
-      } catch (e) { alert("Delete failed: " + (e as Error).message); }
+      } catch (e) { alert(t.errors.deleteFailed + (e as Error).message); }
     });
   }
 
   function onMarkPaid(row: RecurringRow) {
-    if (!confirm(`Mark "${row.name}" as paid?\n\nThis records an expense transaction (MYR ${row.amount}) and advances the next due date by ${row.frequency}.`)) return;
+    const freqLabel = row.frequency === "monthly" ? t.common.monthly : row.frequency === "quarterly" ? t.common.quarterly : t.common.yearly;
+    if (!confirm(interp(t.recurring.confirmMarkPaid, { name: row.name, amount: fmtMoney(row.amount), freq: freqLabel }))) return;
     startTransition(async () => {
       try {
         const r = await markRecurringPaid(row.id);
         setRows((prev) => prev.map((x) => x.id === row.id ? { ...x, next_due_date: r.next_due_date, last_paid_date: new Date().toISOString().slice(0, 10) } : x));
-      } catch (e) { alert("Failed: " + (e as Error).message); }
+      } catch (e) { alert(t.errors.failed + (e as Error).message); }
     });
   }
 
@@ -60,7 +62,7 @@ export function RecurringClient({ initialRows }: { initialRows: RecurringRow[] }
           remind_days_before: row.remind_days_before, status: newStatus,
         });
         setRows((prev) => prev.map((x) => x.id === row.id ? { ...x, status: newStatus } : x));
-      } catch (e) { alert("Failed: " + (e as Error).message); }
+      } catch (e) { alert(t.errors.failed + (e as Error).message); }
     });
   }
 
@@ -71,7 +73,7 @@ export function RecurringClient({ initialRows }: { initialRows: RecurringRow[] }
     <div>
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div className="text-sm text-muted-foreground">
-          {activeRows.length} active · {pausedRows.length} paused
+          {interp(t.recurring.countLine, { active: activeRows.length, paused: pausedRows.length })}
         </div>
         <Button onClick={openNew} className="bg-navy hover:bg-navy-light text-white">
           <Plus className="w-4 h-4 mr-1" />
@@ -85,11 +87,11 @@ export function RecurringClient({ initialRows }: { initialRows: RecurringRow[] }
             <tr>
               <th className="text-left px-4 py-3 font-medium">{t.recurring.name}</th>
               <th className="text-left px-4 py-3 font-medium">{t.recurring.payee}</th>
-              <th className="text-left px-4 py-3 font-medium w-[140px]">Category</th>
+              <th className="text-left px-4 py-3 font-medium w-[140px]">{t.recurring.category}</th>
               <th className="text-left px-4 py-3 font-medium w-[110px]">{t.recurring.frequency}</th>
-              <th className="text-right px-4 py-3 font-medium w-[130px]">Amount</th>
+              <th className="text-right px-4 py-3 font-medium w-[130px]">{t.recurring.amount}</th>
               <th className="text-left px-4 py-3 font-medium w-[180px]">{t.recurring.nextDue}</th>
-              <th className="text-left px-4 py-3 font-medium w-[90px]">Status</th>
+              <th className="text-left px-4 py-3 font-medium w-[90px]">{t.recurring.status}</th>
               <th className="w-[160px]"></th>
             </tr>
           </thead>
@@ -114,27 +116,27 @@ export function RecurringClient({ initialRows }: { initialRows: RecurringRow[] }
                   <td className="px-4 py-3 text-right tabular-nums">{fmtMoney(r.amount)}</td>
                   <td className="px-4 py-3">
                     <div>{fmtDate(r.next_due_date)}</div>
-                    <div className={"text-xs " + dueColor}>{r.status === "active" ? daysLabel(days) : "(paused)"}</div>
+                    <div className={"text-xs " + dueColor}>{r.status === "active" ? localizedDaysLabel(days, t) : t.recurring.paused}</div>
                   </td>
                   <td className="px-4 py-3">
                     {r.status === "active"
-                      ? <span className="inline-block px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wide bg-success-soft text-success">Active</span>
-                      : <span className="inline-block px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wide bg-muted text-muted-foreground">Paused</span>}
+                      ? <span className="inline-block px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wide bg-success-soft text-success">{t.status.active}</span>
+                      : <span className="inline-block px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wide bg-muted text-muted-foreground">{t.status.paused}</span>}
                   </td>
                   <td className="px-2 py-3 align-middle">
                     <div className="flex items-center justify-end gap-0.5">
                       {r.status === "active" && (
-                        <button onClick={() => onMarkPaid(r)} disabled={isPending} className="p-1.5 hover:bg-success/10 rounded text-muted-foreground hover:text-success" title="Mark paid">
+                        <button onClick={() => onMarkPaid(r)} disabled={isPending} className="p-1.5 hover:bg-success/10 rounded text-muted-foreground hover:text-success" title={t.recurring.tipMarkPaid}>
                           <CheckCircle2 className="w-4 h-4" />
                         </button>
                       )}
-                      <button onClick={() => onToggleStatus(r)} disabled={isPending} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-navy" title={r.status === "active" ? "Pause" : "Activate"}>
+                      <button onClick={() => onToggleStatus(r)} disabled={isPending} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-navy" title={r.status === "active" ? t.recurring.tipPause : t.recurring.tipActivate}>
                         {r.status === "active" ? <PauseCircle className="w-4 h-4" /> : <PlayCircle className="w-4 h-4" />}
                       </button>
-                      <button onClick={() => openEdit(r)} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-navy" title="Edit">
+                      <button onClick={() => openEdit(r)} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-navy" title={t.recurring.tipEdit}>
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
-                      <button onClick={() => onDelete(r)} disabled={isPending} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-destructive" title="Delete">
+                      <button onClick={() => onDelete(r)} disabled={isPending} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-destructive" title={t.recurring.tipDelete}>
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>

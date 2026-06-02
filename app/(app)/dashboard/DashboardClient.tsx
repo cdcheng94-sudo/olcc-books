@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useLang } from "@/components/LangProvider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtDate, fmtMoney } from "@/lib/format";
-import { daysLabel, urgencyClasses } from "@/lib/recurring-utils";
+import { localizedDaysLabel, urgencyClasses } from "@/lib/recurring-utils";
 import { MonthlyBarChart } from "@/components/charts/MonthlyBarChart";
 import { CategoryPieChart } from "@/components/charts/CategoryPieChart";
 import { RecentTransactionsList } from "@/components/RecentTransactionsList";
@@ -116,7 +116,7 @@ export function DashboardClient({ summary, toPay, toCollect, trend, byCategory, 
           <CardContent className="pt-0">
             {toCollect.length === 0 ? (
               <Link href="/subscriptions" className="text-xs text-muted-foreground italic hover:text-navy underline">
-                {t.common.empty} — add a subscription
+                {t.dashboard.emptySub}
               </Link>
             ) : (
               <div className="flex flex-col gap-2">
@@ -132,7 +132,7 @@ export function DashboardClient({ summary, toPay, toCollect, trend, byCategory, 
                         </div>
                         <div className="text-right shrink-0 ml-3">
                           <div className="font-bold text-sm tabular-nums">{fmtMoney(s.amount)}</div>
-                          <div className={`text-[11px] font-semibold ${u.text}`}>{daysLabel(s.days_until_due)}</div>
+                          <div className={`text-[11px] font-semibold ${u.text}`}>{localizedDaysLabel(s.days_until_due, t)}</div>
                         </div>
                       </div>
                     </div>
@@ -156,7 +156,7 @@ export function DashboardClient({ summary, toPay, toCollect, trend, byCategory, 
           <CardContent className="pt-0">
             {toPay.length === 0 ? (
               <Link href="/recurring" className="text-xs text-muted-foreground italic hover:text-navy underline">
-                {t.common.empty} — add a recurring payment
+                {t.dashboard.emptyRec}
               </Link>
             ) : (
               <div className="flex flex-col gap-2">
@@ -172,7 +172,7 @@ export function DashboardClient({ summary, toPay, toCollect, trend, byCategory, 
                         </div>
                         <div className="text-right shrink-0 ml-3">
                           <div className="font-bold text-sm tabular-nums">{fmtMoney(r.amount)}</div>
-                          <div className={`text-[11px] font-semibold ${u.text}`}>{daysLabel(r.days_until_due)}</div>
+                          <div className={`text-[11px] font-semibold ${u.text}`}>{localizedDaysLabel(r.days_until_due, t)}</div>
                         </div>
                       </div>
                     </div>

@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useLang } from "@/components/LangProvider";
 import { CATEGORIES } from "@/lib/categories";
 import { todayIso } from "@/lib/format";
 import { FREQUENCIES, type Frequency } from "@/lib/recurring-utils";
@@ -19,6 +20,7 @@ type Props = {
 };
 
 export function RecurringFormModal({ open, onOpenChange, editing, onSaved }: Props) {
+  const { t } = useLang();
   const [name, setName]           = useState("");
   const [payee, setPayee]         = useState("");
   const [amount, setAmount]       = useState("");
@@ -63,57 +65,63 @@ export function RecurringFormModal({ open, onOpenChange, editing, onSaved }: Pro
     });
   }
 
+  const freqLabel: Record<Frequency, string> = {
+    monthly:   t.common.monthly,
+    quarterly: t.common.quarterly,
+    yearly:    t.common.yearly,
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{editing ? "Edit recurring" : "New recurring payment"}</DialogTitle>
+          <DialogTitle>{editing ? t.recurring.dialogEdit : t.recurring.dialogNew}</DialogTitle>
         </DialogHeader>
         <form onSubmit={(e) => { e.preventDefault(); save(); }} className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1 col-span-2">
-            <Label className="text-xs">Name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Annual Accountant Fee" required />
+            <Label className="text-xs">{t.recurring.formName}</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t.recurring.formNamePlaceholder} required />
           </div>
           <div className="flex flex-col gap-1 col-span-2">
-            <Label className="text-xs">Payee (who you pay)</Label>
-            <Input value={payee} onChange={(e) => setPayee(e.target.value)} placeholder="Optional" />
+            <Label className="text-xs">{t.recurring.formPayee}</Label>
+            <Input value={payee} onChange={(e) => setPayee(e.target.value)} placeholder={t.common.optional} />
           </div>
           <div className="flex flex-col gap-1">
-            <Label className="text-xs">Amount (MYR)</Label>
+            <Label className="text-xs">{t.recurring.formAmount}</Label>
             <Input type="number" step="0.01" min="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
           </div>
           <div className="flex flex-col gap-1">
-            <Label className="text-xs">Category</Label>
+            <Label className="text-xs">{t.recurring.formCategory}</Label>
             <select value={category} onChange={(e) => setCategory(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
               {CATEGORIES.expense.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <Label className="text-xs">Frequency</Label>
-            <select value={frequency} onChange={(e) => setFrequency(e.target.value as Frequency)} className="h-9 rounded-md border border-input bg-background px-3 text-sm capitalize">
-              {FREQUENCIES.map((f) => <option key={f} value={f}>{f}</option>)}
+            <Label className="text-xs">{t.recurring.formFrequency}</Label>
+            <select value={frequency} onChange={(e) => setFrequency(e.target.value as Frequency)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+              {FREQUENCIES.map((f) => <option key={f} value={f}>{freqLabel[f]}</option>)}
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <Label className="text-xs">Next due date</Label>
+            <Label className="text-xs">{t.recurring.formNextDue}</Label>
             <Input type="date" value={nextDue} onChange={(e) => setNextDue(e.target.value)} required />
           </div>
           <div className="flex flex-col gap-1">
-            <Label className="text-xs">Remind days before</Label>
+            <Label className="text-xs">{t.recurring.formRemindDays}</Label>
             <Input type="number" min="0" max="365" value={remindDays} onChange={(e) => setRemindDays(e.target.value)} />
           </div>
           <div className="flex flex-col gap-1">
-            <Label className="text-xs">Status</Label>
-            <select value={status} onChange={(e) => setStatus(e.target.value as "active" | "paused")} className="h-9 rounded-md border border-input bg-background px-3 text-sm capitalize">
-              <option value="active">Active</option>
-              <option value="paused">Paused</option>
+            <Label className="text-xs">{t.recurring.formStatus}</Label>
+            <select value={status} onChange={(e) => setStatus(e.target.value as "active" | "paused")} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+              <option value="active">{t.status.active}</option>
+              <option value="paused">{t.status.paused}</option>
             </select>
           </div>
           {error && <div className="col-span-2 text-sm text-destructive">{error}</div>}
           <DialogFooter className="col-span-2 mt-2">
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isPending}>Cancel</Button>
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isPending}>{t.common.cancel}</Button>
             <Button type="submit" disabled={isPending} className="bg-navy hover:bg-navy-light text-white">
-              {isPending ? "Saving…" : "Save"}
+              {isPending ? t.common.saving : t.common.save}
             </Button>
           </DialogFooter>
         </form>

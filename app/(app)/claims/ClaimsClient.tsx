@@ -5,6 +5,7 @@ import { Plus, CheckCircle2, CircleCheck, Pencil, Trash2, ExternalLink } from "l
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useLang } from "@/components/LangProvider";
+import { interp } from "@/lib/i18n";
 import { fmtDate, fmtMoney } from "@/lib/format";
 import type { ClaimRow, ClaimStatus } from "@/lib/types";
 import { deleteClaim, approveClaim, markClaimPaid } from "./actions";
@@ -37,6 +38,19 @@ export function ClaimsClient({ initialRows }: { initialRows: ClaimRow[] }) {
     paid:     rows.filter((r) => r.status === "paid").length,
   }), [rows]);
 
+  const filterLabel: Record<Filter, string> = {
+    all:      t.claims.filterAll,
+    pending:  t.claims.filterPending,
+    approved: t.claims.filterApproved,
+    paid:     t.claims.filterPaid,
+  };
+
+  const statusLabel: Record<ClaimStatus, string> = {
+    pending:  t.status.pending,
+    approved: t.status.approved,
+    paid:     t.status.paid,
+  };
+
   function openNew()  { setEditing(null); setModalOpen(true); }
   function openEdit(row: ClaimRow) { setEditing(row); setModalOpen(true); }
 
@@ -50,33 +64,36 @@ export function ClaimsClient({ initialRows }: { initialRows: ClaimRow[] }) {
   }
 
   function onDelete(row: ClaimRow) {
-    if (!confirm(`Delete claim "${row.item_desc}"${row.status === "paid" ? " — its expense transaction will also be removed" : ""}? This cannot be undone.`)) return;
+    const msg = row.status === "paid"
+      ? interp(t.claims.confirmDeletePaid, { item: row.item_desc })
+      : interp(t.claims.confirmDelete,     { item: row.item_desc });
+    if (!confirm(msg)) return;
     startTransition(async () => {
       try {
         await deleteClaim(row.id);
         setRows((prev) => prev.filter((r) => r.id !== row.id));
-      } catch (e) { alert("Delete failed: " + (e as Error).message); }
+      } catch (e) { alert(t.errors.deleteFailed + (e as Error).message); }
     });
   }
 
   function onApprove(row: ClaimRow) {
-    if (!confirm(`Approve ${row.claimant}'s claim for ${fmtMoney(row.amount)}?`)) return;
+    if (!confirm(interp(t.claims.confirmApprove, { claimant: row.claimant, amount: fmtMoney(row.amount) }))) return;
     startTransition(async () => {
       try {
         await approveClaim(row.id);
         setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, status: "approved" } : r));
-      } catch (e) { alert("Approve failed: " + (e as Error).message); }
+      } catch (e) { alert(t.errors.approveFailed + (e as Error).message); }
     });
   }
 
   function onMarkPaid(row: ClaimRow) {
-    if (!confirm(`Mark this claim paid? ${fmtMoney(row.amount)} will be recorded as an expense in /transactions.`)) return;
+    if (!confirm(interp(t.claims.confirmMarkPaid, { amount: fmtMoney(row.amount) }))) return;
     startTransition(async () => {
       try {
         await markClaimPaid(row.id);
         const today = new Date().toISOString().slice(0, 10);
         setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, status: "paid", paid_date: today } : r));
-      } catch (e) { alert("Mark paid failed: " + (e as Error).message); }
+      } catch (e) { alert(t.errors.markPaidFailed + (e as Error).message); }
     });
   }
 
@@ -95,7 +112,7 @@ export function ClaimsClient({ initialRows }: { initialRows: ClaimRow[] }) {
                   : "bg-card text-muted-foreground border-border hover:text-navy")
               }
             >
-              {f === "all" ? "All" : f[0].toUpperCase() + f.slice(1)} · {counts[f]}
+              {filterLabel[f]} · {counts[f]}
             </button>
           ))}
         </div>
@@ -109,11 +126,11 @@ export function ClaimsClient({ initialRows }: { initialRows: ClaimRow[] }) {
         <table className="w-full text-sm">
           <thead className="bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
-              <th className="text-left  px-4 py-3 font-medium w-[110px]">Date</th>
+              <th className="text-left  px-4 py-3 font-medium w-[110px]">{t.claims.date}</th>
               <th className="text-left  px-4 py-3 font-medium">{t.claims.claimant}</th>
               <th className="text-left  px-4 py-3 font-medium">{t.claims.item}</th>
-              <th className="text-left  px-4 py-3 font-medium w-[110px]">Category</th>
-              <th className="text-right px-4 py-3 font-medium w-[120px]">Amount</th>
+              <th className="text-left  px-4 py-3 font-medium w-[110px]">{t.claims.category}</th>
+              <th className="text-right px-4 py-3 font-medium w-[120px]">{t.claims.amount}</th>
               <th className="text-left  px-4 py-3 font-medium w-[100px]">{t.claims.status}</th>
               <th className="w-[170px]"></th>
             </tr>
@@ -129,7 +146,7 @@ export function ClaimsClient({ initialRows }: { initialRows: ClaimRow[] }) {
                   <div>{r.item_desc}</div>
                   {r.receipt_url && (
                     <a href={r.receipt_url} target="_blank" rel="noreferrer" className="text-[11px] text-muted-foreground hover:text-navy underline inline-flex items-center gap-0.5">
-                      receipt <ExternalLink className="w-2.5 h-2.5" />
+                      {t.claims.receiptLink} <ExternalLink className="w-2.5 h-2.5" />
                     </a>
                   )}
                 </td>
@@ -137,25 +154,25 @@ export function ClaimsClient({ initialRows }: { initialRows: ClaimRow[] }) {
                 <td className="px-4 py-3 text-right tabular-nums font-semibold">{fmtMoney(r.amount)}</td>
                 <td className="px-4 py-3">
                   <span className={"inline-block px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wide " + STATUS_BADGE[r.status]}>
-                    {r.status}
+                    {statusLabel[r.status]}
                   </span>
                 </td>
                 <td className="px-2 py-3 align-middle">
                   <div className="flex items-center justify-end gap-0.5">
                     {r.status === "pending" && (
-                      <button onClick={() => onApprove(r)} disabled={isPending} className="p-1.5 hover:bg-accent rounded text-muted-foreground hover:text-navy" title="Approve">
+                      <button onClick={() => onApprove(r)} disabled={isPending} className="p-1.5 hover:bg-accent rounded text-muted-foreground hover:text-navy" title={t.claims.tipApprove}>
                         <CircleCheck className="w-4 h-4" />
                       </button>
                     )}
                     {r.status === "approved" && (
-                      <button onClick={() => onMarkPaid(r)} disabled={isPending} className="p-1.5 hover:bg-success/10 rounded text-muted-foreground hover:text-success" title="Mark paid">
+                      <button onClick={() => onMarkPaid(r)} disabled={isPending} className="p-1.5 hover:bg-success/10 rounded text-muted-foreground hover:text-success" title={t.claims.tipMarkPaid}>
                         <CheckCircle2 className="w-4 h-4" />
                       </button>
                     )}
-                    <button onClick={() => openEdit(r)} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-navy" title="Edit">
+                    <button onClick={() => openEdit(r)} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-navy" title={t.claims.tipEdit}>
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => onDelete(r)} disabled={isPending} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-destructive" title="Delete">
+                    <button onClick={() => onDelete(r)} disabled={isPending} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-destructive" title={t.claims.tipDelete}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>

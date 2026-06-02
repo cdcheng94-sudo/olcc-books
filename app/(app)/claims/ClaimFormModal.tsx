@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useLang } from "@/components/LangProvider";
 import { todayIso } from "@/lib/format";
 import { CLAIM_CATEGORIES } from "@/lib/categories";
 import type { ClaimRow } from "@/lib/types";
@@ -18,6 +19,7 @@ type Props = {
 };
 
 export function ClaimFormModal({ open, onOpenChange, editing, onSaved }: Props) {
+  const { t } = useLang();
   const [date,       setDate]       = useState(todayIso());
   const [claimant,   setClaimant]   = useState("");
   const [itemDesc,   setItemDesc]   = useState("");
@@ -71,37 +73,37 @@ export function ClaimFormModal({ open, onOpenChange, editing, onSaved }: Props) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{editing ? "Edit claim" : "New claim"}</DialogTitle>
+          <DialogTitle>{editing ? t.claims.dialogEdit : t.claims.dialogNew}</DialogTitle>
         </DialogHeader>
         <form onSubmit={(e) => { e.preventDefault(); save(); }} className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1">
-            <Label className="text-xs">Date</Label>
+            <Label className="text-xs">{t.claims.formDate}</Label>
             <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
           </div>
           <div className="flex flex-col gap-1">
-            <Label className="text-xs">Category</Label>
+            <Label className="text-xs">{t.claims.formCategory}</Label>
             <select value={category} onChange={(e) => setCategory(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
               {CLAIM_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div className="flex flex-col gap-1 col-span-2">
-            <Label className="text-xs">Claimant</Label>
-            <Input value={claimant} onChange={(e) => setClaimant(e.target.value)} placeholder="Staff name" required />
+            <Label className="text-xs">{t.claims.formClaimant}</Label>
+            <Input value={claimant} onChange={(e) => setClaimant(e.target.value)} placeholder={t.claims.formClaimantPlaceholder} required />
           </div>
           <div className="flex flex-col gap-1 col-span-2">
-            <Label className="text-xs">Item / what was spent on</Label>
-            <Input value={itemDesc} onChange={(e) => setItemDesc(e.target.value)} placeholder="e.g. Grab to site visit" required />
+            <Label className="text-xs">{t.claims.formItem}</Label>
+            <Input value={itemDesc} onChange={(e) => setItemDesc(e.target.value)} placeholder={t.claims.formItemPlaceholder} required />
           </div>
           <div className="flex flex-col gap-1">
-            <Label className="text-xs">Amount (MYR)</Label>
+            <Label className="text-xs">{t.claims.formAmount}</Label>
             <Input type="number" step="0.01" min="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
           </div>
           <div className="flex flex-col gap-1">
-            <Label className="text-xs">Receipt link (optional)</Label>
-            <Input value={receiptUrl} onChange={(e) => setReceiptUrl(e.target.value)} placeholder="https://drive.google.com/..." />
+            <Label className="text-xs">{t.claims.formReceiptLink}</Label>
+            <Input value={receiptUrl} onChange={(e) => setReceiptUrl(e.target.value)} placeholder={t.claims.formReceiptPlaceholder} />
           </div>
           <div className="flex flex-col gap-1 col-span-2">
-            <Label className="text-xs">Note (optional)</Label>
+            <Label className="text-xs">{t.claims.formNote}</Label>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
@@ -111,9 +113,9 @@ export function ClaimFormModal({ open, onOpenChange, editing, onSaved }: Props) 
           </div>
           {error && <div className="col-span-2 text-sm text-destructive">{error}</div>}
           <DialogFooter className="col-span-2 mt-2">
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isPending}>Cancel</Button>
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isPending}>{t.common.cancel}</Button>
             <Button type="submit" disabled={isPending} className="bg-navy hover:bg-navy-light text-white">
-              {isPending ? "Saving…" : "Save"}
+              {isPending ? t.common.saving : t.common.save}
             </Button>
           </DialogFooter>
         </form>

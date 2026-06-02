@@ -136,7 +136,7 @@ export function TransactionFormModal({ open, onOpenChange, editing, prefill, onS
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editing ? "Edit transaction" : "New transaction"}</DialogTitle>
+            <DialogTitle>{editing ? t.tx.dialogEdit : t.tx.dialogNew}</DialogTitle>
           </DialogHeader>
 
           <form
@@ -183,11 +183,11 @@ export function TransactionFormModal({ open, onOpenChange, editing, prefill, onS
             </div>
             <div className="flex flex-col gap-1 col-span-2">
               <Label className="text-xs">{t.tx.party}</Label>
-              <Input value={party} onChange={(e) => setParty(e.target.value)} placeholder="Customer / supplier (optional)" />
+              <Input value={party} onChange={(e) => setParty(e.target.value)} placeholder={t.tx.partyPlaceholder} />
             </div>
             <div className="flex flex-col gap-1 col-span-2">
               <Label className="text-xs">{t.tx.note}</Label>
-              <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Description (optional)" rows={2} />
+              <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={t.tx.notePlaceholder} rows={2} />
             </div>
             <div className="flex flex-col gap-1 col-span-2">
               <Label className="text-xs">{t.tx.receipt}</Label>
@@ -198,8 +198,8 @@ export function TransactionFormModal({ open, onOpenChange, editing, prefill, onS
               />
               {existingReceiptUrl && !file && (
                 <div className="text-xs text-muted-foreground mt-1">
-                  Current: <a href={existingReceiptUrl} target="_blank" rel="noreferrer" className="text-navy underline">View existing</a>
-                  {" — "}upload a new file to replace.
+                  {t.tx.currentReceipt}<a href={existingReceiptUrl} target="_blank" rel="noreferrer" className="text-navy underline">{t.tx.viewExisting}</a>
+                  {t.tx.replaceHint}
                 </div>
               )}
             </div>
@@ -222,17 +222,17 @@ export function TransactionFormModal({ open, onOpenChange, editing, prefill, onS
       <Dialog open={confirmNoReceipt} onOpenChange={(o) => !o && setConfirmNoReceipt(false)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Save without a receipt?</DialogTitle>
+            <DialogTitle>{t.tx.noReceiptTitle}</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            You haven&apos;t attached a receipt photo or PDF. Are you sure you want to save this transaction without one?
+            {t.tx.noReceiptDesc}
           </p>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => setConfirmNoReceipt(false)}>
-              Go back &amp; attach
+              {t.tx.goBackAttach}
             </Button>
             <Button type="button" onClick={() => { setConfirmNoReceipt(false); save(); }} className="bg-navy hover:bg-navy-light text-white">
-              Yes, save without
+              {t.tx.yesSaveWithout}
             </Button>
           </DialogFooter>
         </DialogContent>

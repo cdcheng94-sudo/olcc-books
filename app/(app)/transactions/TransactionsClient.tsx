@@ -86,7 +86,7 @@ export function TransactionsClient({ initialRows }: { initialRows: TransactionRo
       setPrefill(json.parsed as TxPrefill);
       setModalOpen(true);
     } catch (err) {
-      alert("Scan failed: " + (err as Error).message);
+      alert(t.errors.scanFailed + (err as Error).message);
     } finally {
       setScanning(false);
     }
@@ -107,13 +107,13 @@ export function TransactionsClient({ initialRows }: { initialRows: TransactionRo
   }
 
   function onDelete(row: TransactionRow) {
-    if (!confirm("Delete this transaction? This cannot be undone.")) return;
+    if (!confirm(t.tx.confirmDeleteTx)) return;
     startTransition(async () => {
       try {
         await deleteTransaction(row.id);
         setRows((prev) => prev.filter((r) => r.id !== row.id));
       } catch (e) {
-        alert("Delete failed: " + (e as Error).message);
+        alert(t.errors.deleteFailed + (e as Error).message);
       }
     });
   }
@@ -128,7 +128,7 @@ export function TransactionsClient({ initialRows }: { initialRows: TransactionRo
       {/* header row */}
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div className="text-sm text-muted-foreground">
-          {rows.length} {rows.length === 1 ? "entry" : "entries"}
+          {rows.length} {rows.length === 1 ? t.common.entry : t.common.entries}
         </div>
         <div className="flex items-center gap-2">
           <input
@@ -147,11 +147,11 @@ export function TransactionsClient({ initialRows }: { initialRows: TransactionRo
             className="border-gold text-navy hover:bg-gold/10"
           >
             <ScanLine className="w-4 h-4 mr-1" />
-            {scanning ? "Scanning…" : "Scan receipt"}
+            {scanning ? t.tx.scanning : t.tx.scanReceipt}
           </Button>
           <Button onClick={openNew} className="bg-navy hover:bg-navy-light text-white">
             <Plus className="w-4 h-4 mr-1" />
-            {t.tx.income} / {t.tx.expense}
+            {t.tx.newBoth}
           </Button>
         </div>
       </div>
@@ -160,7 +160,7 @@ export function TransactionsClient({ initialRows }: { initialRows: TransactionRo
       <Card className="p-4 mb-5">
         <div className="flex flex-wrap gap-3 items-end">
           <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-            <span>{t.tx.date.replace("Date", "Month")}</span>
+            <span>{t.tx.filterMonth}</span>
             <input
               type="month"
               value={filters.yearMonth}
@@ -169,25 +169,25 @@ export function TransactionsClient({ initialRows }: { initialRows: TransactionRo
             />
           </label>
           <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-            <span>{t.tx.type}</span>
+            <span>{t.tx.filterType}</span>
             <select
               value={filters.type}
               onChange={(e) => setFilters((f) => ({ ...f, type: e.target.value as Filters["type"], category: "" }))}
               className="border border-border rounded-md px-3 py-1.5 text-sm bg-background min-w-[120px]"
             >
-              <option value="">All</option>
+              <option value="">{t.tx.filterAllType}</option>
               <option value="income">{t.tx.income}</option>
               <option value="expense">{t.tx.expense}</option>
             </select>
           </label>
           <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-            <span>{t.tx.category}</span>
+            <span>{t.tx.filterCategory}</span>
             <select
               value={filters.category}
               onChange={(e) => setFilters((f) => ({ ...f, category: e.target.value }))}
               className="border border-border rounded-md px-3 py-1.5 text-sm bg-background min-w-[160px]"
             >
-              <option value="">All</option>
+              <option value="">{t.tx.filterAllCat}</option>
               {categoryChoices.map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
@@ -200,7 +200,7 @@ export function TransactionsClient({ initialRows }: { initialRows: TransactionRo
             onClick={() => setFilters({ yearMonth: NO_MONTH, type: "", category: "" })}
             className="text-muted-foreground"
           >
-            Show all (older too)
+            {t.tx.showOlder}
           </Button>
         </div>
       </Card>
@@ -253,10 +253,10 @@ export function TransactionsClient({ initialRows }: { initialRows: TransactionRo
                   ) : <span className="text-muted-foreground">—</span>}
                 </td>
                 <td className="px-2 py-3 text-right">
-                  <button onClick={() => openEdit(r)} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-navy" title="Edit">
+                  <button onClick={() => openEdit(r)} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-navy" title={t.common.edit}>
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
-                  <button onClick={() => onDelete(r)} disabled={isPending} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-destructive" title="Delete">
+                  <button onClick={() => onDelete(r)} disabled={isPending} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-destructive" title={t.common.delete}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </td>

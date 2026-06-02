@@ -2,20 +2,17 @@
 
 import Link from "next/link";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
+import { useLang } from "@/components/LangProvider";
 import { fmtDate, fmtMoney } from "@/lib/format";
 import type { TransactionRow } from "@/lib/types";
 
-/**
- * Compact "what just happened" list for the Dashboard. Always renders
- * up to 8 rows; if empty, hints the user to add one. Icons mirror the
- * stat-card metaphor: green up = income, red down = expense.
- */
 export function RecentTransactionsList({ rows }: { rows: TransactionRow[] }) {
+  const { t } = useLang();
   if (rows.length === 0) {
     return (
       <div className="text-xs text-muted-foreground italic py-6 text-center">
-        No transactions yet —{" "}
-        <Link href="/transactions" className="underline hover:text-navy">add the first one</Link>
+        {t.dashboard.noTxYet}
+        <Link href="/transactions" className="underline hover:text-navy">{t.dashboard.addFirst}</Link>
       </div>
     );
   }

@@ -5,6 +5,7 @@ import { Plus, FileDown, Send, CheckCircle2, Pencil, Trash2 } from "lucide-react
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useLang } from "@/components/LangProvider";
+import { interp } from "@/lib/i18n";
 import { fmtDate, fmtMoney } from "@/lib/format";
 import { daysUntilDue } from "@/lib/recurring-utils";
 import { PAYMENT_METHODS } from "@/lib/categories";
@@ -45,6 +46,19 @@ export function InvoicesClient({ initialRows }: { initialRows: InvoiceRow[] }) {
     paid:   rows.filter((r) => r.status === "paid").length,
   }), [rows]);
 
+  const filterLabel: Record<Filter, string> = {
+    all:   t.invoice.filterAll,
+    draft: t.invoice.filterDraft,
+    sent:  t.invoice.filterSent,
+    paid:  t.invoice.filterPaid,
+  };
+
+  const statusLabel: Record<InvoiceStatus, string> = {
+    draft: t.status.draft,
+    sent:  t.status.sent,
+    paid:  t.status.paid,
+  };
+
   function openNew()  { setEditing(null); setModalOpen(true); }
   function openEdit(row: InvoiceRow) { setEditing(row); setModalOpen(true); }
 
@@ -58,13 +72,15 @@ export function InvoicesClient({ initialRows }: { initialRows: InvoiceRow[] }) {
   }
 
   function onDelete(row: InvoiceRow) {
-    if (row.status !== "draft" && !confirm(`This invoice has been ${row.status}. Delete anyway? Any linked receipt/transaction is NOT removed.`)) return;
-    if (row.status === "draft" && !confirm(`Delete invoice ${row.invoice_number}? This cannot be undone.`)) return;
+    const msg = row.status === "draft"
+      ? interp(t.invoice.confirmDelDraft, { number: row.invoice_number })
+      : interp(t.invoice.confirmDelSent,  { number: row.invoice_number, status: statusLabel[row.status] });
+    if (!confirm(msg)) return;
     startTransition(async () => {
       try {
         await deleteInvoice(row.id);
         setRows((prev) => prev.filter((r) => r.id !== row.id));
-      } catch (e) { alert("Delete failed: " + (e as Error).message); }
+      } catch (e) { alert(t.errors.deleteFailed + (e as Error).message); }
     });
   }
 
@@ -73,36 +89,39 @@ export function InvoicesClient({ initialRows }: { initialRows: InvoiceRow[] }) {
       try {
         const url = await getInvoiceDownloadUrl(row.id);
         window.open(url, "_blank", "noopener,noreferrer");
-      } catch (e) { alert("Download failed: " + (e as Error).message); }
+      } catch (e) { alert(t.errors.downloadFailed + (e as Error).message); }
     });
   }
 
   function onSendEmail(row: InvoiceRow) {
-    if (!row.customer_email) { alert("This customer has no email. Edit the invoice to add one."); return; }
-    if (!confirm(`Send invoice ${row.invoice_number} to ${row.customer_email}? PDF will be regenerated and attached.`)) return;
+    if (!row.customer_email) { alert(t.common.noEmail); return; }
+    if (!confirm(interp(t.invoice.confirmSend, { number: row.invoice_number, email: row.customer_email }))) return;
     startTransition(async () => {
       try {
         await sendInvoiceByEmail(row.id);
-        // Reflect status flip locally
         setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, status: r.status === "draft" ? "sent" : r.status } : r));
-        alert("Sent ✓");
-      } catch (e) { alert("Send failed: " + (e as Error).message); }
+        alert(t.invoice.sentOk);
+      } catch (e) { alert(t.errors.sendFailed + (e as Error).message); }
     });
   }
 
   function onMarkPaid(row: InvoiceRow) {
     const method = prompt(
-      `Mark ${row.invoice_number} (${fmtMoney(row.total)}) as paid.\n\nPayment method? One of: ${PAYMENT_METHODS.join(", ")}`,
+      interp(t.invoice.markPaidPrompt, {
+        number:  row.invoice_number,
+        amount:  fmtMoney(row.total),
+        methods: PAYMENT_METHODS.join(", "),
+      }),
       "Bank Transfer",
     );
     if (!method) return;
-    if (!PAYMENT_METHODS.includes(method as never)) { alert("Unknown payment method."); return; }
+    if (!PAYMENT_METHODS.includes(method as never)) { alert(t.invoice.markPaidUnknown); return; }
     startTransition(async () => {
       try {
         await markInvoicePaid(row.id, method);
         setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, status: "paid" } : r));
-        alert(`Marked paid. A receipt + income transaction have been created automatically.`);
-      } catch (e) { alert("Failed: " + (e as Error).message); }
+        alert(t.invoice.markPaidOk);
+      } catch (e) { alert(t.errors.markPaidFailed + (e as Error).message); }
     });
   }
 
@@ -121,7 +140,7 @@ export function InvoicesClient({ initialRows }: { initialRows: InvoiceRow[] }) {
                   : "bg-card text-muted-foreground border-border hover:text-navy")
               }
             >
-              {f === "all" ? "All" : f[0].toUpperCase() + f.slice(1)} · {counts[f]}
+              {filterLabel[f]} · {counts[f]}
             </button>
           ))}
         </div>
@@ -138,7 +157,7 @@ export function InvoicesClient({ initialRows }: { initialRows: InvoiceRow[] }) {
               <th className="text-left px-4 py-3 font-medium w-[140px]">{t.invoice.number}</th>
               <th className="text-left px-4 py-3 font-medium">{t.invoice.customer}</th>
               <th className="text-left px-4 py-3 font-medium w-[120px]">{t.invoice.dueDate}</th>
-              <th className="text-right px-4 py-3 font-medium w-[130px]">Total</th>
+              <th className="text-right px-4 py-3 font-medium w-[130px]">{t.invoice.total}</th>
               <th className="text-left px-4 py-3 font-medium w-[90px]">{t.invoice.status}</th>
               <th className="w-[200px]"></th>
             </tr>
@@ -158,33 +177,33 @@ export function InvoicesClient({ initialRows }: { initialRows: InvoiceRow[] }) {
                   </td>
                   <td className="px-4 py-3">
                     <div>{fmtDate(r.due_date)}</div>
-                    {overdue && <div className="text-[11px] text-destructive font-semibold">{Math.abs(days)} days overdue</div>}
+                    {overdue && <div className="text-[11px] text-destructive font-semibold">{Math.abs(days)}{t.invoice.daysOverdueSuffix}</div>}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums font-semibold">{fmtMoney(r.total)}</td>
                   <td className="px-4 py-3">
                     <span className={"inline-block px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wide " + STATUS_BADGE[r.status]}>
-                      {r.status}
+                      {statusLabel[r.status]}
                     </span>
                   </td>
                   <td className="px-2 py-3 align-middle">
                     <div className="flex items-center justify-end gap-0.5">
-                      <button onClick={() => onDownload(r)} disabled={isPending} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-navy" title="Download PDF">
+                      <button onClick={() => onDownload(r)} disabled={isPending} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-navy" title={t.invoice.tipDownloadPdf}>
                         <FileDown className="w-4 h-4" />
                       </button>
                       {r.status !== "paid" && r.customer_email && (
-                        <button onClick={() => onSendEmail(r)} disabled={isPending} className="p-1.5 hover:bg-warning-soft rounded text-muted-foreground hover:text-warning" title="Send by email">
+                        <button onClick={() => onSendEmail(r)} disabled={isPending} className="p-1.5 hover:bg-warning-soft rounded text-muted-foreground hover:text-warning" title={t.invoice.tipSendEmail}>
                           <Send className="w-4 h-4" />
                         </button>
                       )}
                       {r.status !== "paid" && (
-                        <button onClick={() => onMarkPaid(r)} disabled={isPending} className="p-1.5 hover:bg-success/10 rounded text-muted-foreground hover:text-success" title="Mark paid">
+                        <button onClick={() => onMarkPaid(r)} disabled={isPending} className="p-1.5 hover:bg-success/10 rounded text-muted-foreground hover:text-success" title={t.invoice.tipMarkPaid}>
                           <CheckCircle2 className="w-4 h-4" />
                         </button>
                       )}
-                      <button onClick={() => openEdit(r)} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-navy" title="Edit">
+                      <button onClick={() => openEdit(r)} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-navy" title={t.invoice.tipEdit}>
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
-                      <button onClick={() => onDelete(r)} disabled={isPending} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-destructive" title="Delete">
+                      <button onClick={() => onDelete(r)} disabled={isPending} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-destructive" title={t.invoice.tipDelete}>
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>

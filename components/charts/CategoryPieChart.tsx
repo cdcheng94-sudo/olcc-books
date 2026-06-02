@@ -1,6 +1,7 @@
 "use client";
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { useLang } from "@/components/LangProvider";
 import type { CategorySlice } from "@/lib/queries/dashboard";
 import { fmtMoney } from "@/lib/format";
 
@@ -18,10 +19,11 @@ const SLICE_COLORS = [
 ];
 
 export function CategoryPieChart({ data }: { data: CategorySlice[] }) {
+  const { t } = useLang();
   if (data.length === 0) {
     return (
       <div className="w-full h-[220px] flex items-center justify-center text-xs text-muted-foreground italic">
-        No expenses this month
+        {t.dashboard.noExpenseMonth}
       </div>
     );
   }
@@ -61,7 +63,7 @@ export function CategoryPieChart({ data }: { data: CategorySlice[] }) {
           </PieChart>
         </ResponsiveContainer>
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Total</div>
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t.dashboard.total}</div>
           <div className="text-sm font-bold tabular-nums">{fmtMoney(total)}</div>
         </div>
       </div>

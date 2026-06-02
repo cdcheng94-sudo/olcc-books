@@ -1,22 +1,19 @@
 "use client";
 
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { useLang } from "@/components/LangProvider";
 import type { MonthlyTrendPoint } from "@/lib/queries/dashboard";
 import { fmtMoney } from "@/lib/format";
 
-/**
- * 6-month income vs expense bar chart. Bars are paired per month.
- * Income uses brand success-green, expense uses destructive-red,
- * both pulled from CSS variables so the theme stays in one place.
- */
 export function MonthlyBarChart({ data }: { data: MonthlyTrendPoint[] }) {
+  const { t } = useLang();
   const empty = data.every((d) => d.income === 0 && d.expense === 0);
 
   return (
     <div className="w-full h-[260px]">
       {empty ? (
         <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground italic">
-          No transactions in the last 6 months
+          {t.dashboard.noData6m}
         </div>
       ) : (
         <ResponsiveContainer width="100%" height="100%">
@@ -48,8 +45,8 @@ export function MonthlyBarChart({ data }: { data: MonthlyTrendPoint[] }) {
               iconType="circle"
               wrapperStyle={{ fontSize: 11, paddingTop: 4 }}
             />
-            <Bar dataKey="income"  name="Income"  fill="hsl(var(--success))"     radius={[4, 4, 0, 0]} maxBarSize={36} />
-            <Bar dataKey="expense" name="Expense" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} maxBarSize={36} />
+            <Bar dataKey="income"  name={t.dashboard.income}  fill="hsl(var(--success))"     radius={[4, 4, 0, 0]} maxBarSize={36} />
+            <Bar dataKey="expense" name={t.dashboard.expense} fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} maxBarSize={36} />
           </BarChart>
         </ResponsiveContainer>
       )}
