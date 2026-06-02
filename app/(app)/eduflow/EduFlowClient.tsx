@@ -99,14 +99,14 @@ export function EduFlowClient() {
               type="button"
               onClick={() => pickPlan(p.key)}
               className={
-                "text-left rounded-xl transition-all p-5 relative overflow-hidden " +
+                "text-left rounded-xl transition-all p-5 relative " +
                 (selected
                   ? "border-2 border-gold bg-gold/[0.08] shadow-lg ring-4 ring-gold/25"
                   : "border-2 border-border bg-card hover:border-gold/60 hover:shadow-sm")
               }
             >
-              {/* gold top strip on selected card */}
-              {selected && <div className="absolute top-0 left-0 right-0 h-1.5 bg-gold" />}
+              {/* gold top strip on selected card (rounded to match card corners) */}
+              {selected && <div className="absolute top-0 left-0 right-0 h-1.5 bg-gold rounded-t-[0.4rem]" />}
               {isPro && (
                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gold text-primary-deep text-[10px] font-bold tracking-wider px-3 py-0.5 rounded-full uppercase">
                   Most popular
