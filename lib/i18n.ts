@@ -355,6 +355,7 @@ export const T = {
       startsAt:        "(起价)",
       plans: {
         starter: {
+          label:    "入门版",
           audience: "≤ 50 学生 · 1 位老板 + 2-3 老师",
           features: [
             "8 大核心模块",
@@ -365,9 +366,10 @@ export const T = {
           ],
         },
         professional: {
+          label:    "专业版",
           audience: "50-200 学生 · 4-10 位老师",
           features: [
-            "Starter 所有功能",
+            "入门版所有功能",
             "WhatsApp 自动催款",
             "调课自动群发通知",
             "最多 2 间分院",
@@ -375,9 +377,10 @@ export const T = {
           ],
         },
         enterprise: {
+          label:    "企业版",
           audience: "200+ 学生 · 多分院 · 想客制",
           features: [
-            "Professional 所有功能",
+            "专业版所有功能",
             "无限分院",
             "白标(您的品牌名)",
             "客制开发 · 专属经理",
@@ -795,6 +798,7 @@ export const T = {
       startsAt:        "(starts at)",
       plans: {
         starter: {
+          label:    "Starter",
           audience: "≤ 50 students · 1 boss + 2-3 teachers",
           features: [
             "8 core modules",
@@ -805,6 +809,7 @@ export const T = {
           ],
         },
         professional: {
+          label:    "Professional",
           audience: "50-200 students · 4-10 teachers",
           features: [
             "Everything in Starter",
@@ -815,6 +820,7 @@ export const T = {
           ],
         },
         enterprise: {
+          label:    "Enterprise",
           audience: "200+ students · multi-branch · custom",
           features: [
             "Everything in Professional",

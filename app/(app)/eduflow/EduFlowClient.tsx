@@ -115,7 +115,7 @@ export function EduFlowClient() {
                 </span>
               )}
               <div className="flex items-center gap-1.5 mb-1">
-                <div className="text-base font-bold text-navy">{p.label}</div>
+                <div className="text-base font-bold text-navy">{t.eduflow.plans[p.key].label}</div>
                 {selected && (
                   <span className="ml-auto bg-gold text-primary-deep rounded-full w-5 h-5 flex items-center justify-center">
                     <Check size={12} strokeWidth={3} />
@@ -182,7 +182,7 @@ export function EduFlowClient() {
                 />
                 <span>{t.eduflow.formFirstFree}</span>
                 <span className="text-[10px] text-muted-foreground">
-                  {plan.firstMonthFree ? interp(t.eduflow.formDefaultFor, { plan: plan.label }) : ""}
+                  {plan.firstMonthFree ? interp(t.eduflow.formDefaultFor, { plan: t.eduflow.plans[planKey].label }) : ""}
                 </span>
               </label>
             </div>
@@ -230,18 +230,18 @@ export function EduFlowClient() {
             <div className="md:col-span-2 bg-muted/30 rounded-md p-4 text-sm">
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold mb-2">{t.eduflow.summaryWillInclude}</div>
               <div className="flex justify-between text-xs">
-                <span>{interp(t.eduflow.summarySetup, { plan: plan.label })}</span>
+                <span>{interp(t.eduflow.summarySetup, { plan: t.eduflow.plans[planKey].label })}</span>
                 <span className="tabular-nums">{fmtMoney(setupEff)}</span>
               </div>
               {!firstFreeEff && (
                 <div className="flex justify-between text-xs">
-                  <span>{interp(t.eduflow.summaryFirstMonth, { plan: plan.label })}</span>
+                  <span>{interp(t.eduflow.summaryFirstMonth, { plan: t.eduflow.plans[planKey].label })}</span>
                   <span className="tabular-nums">{fmtMoney(monthlyEff)}</span>
                 </div>
               )}
               {firstFreeEff && (
                 <div className="flex justify-between text-xs text-success">
-                  <span>{interp(t.eduflow.summaryFirstMonth, { plan: plan.label })}</span>
+                  <span>{interp(t.eduflow.summaryFirstMonth, { plan: t.eduflow.plans[planKey].label })}</span>
                   <span className="font-bold">{t.eduflow.summaryFree}</span>
                 </div>
               )}
