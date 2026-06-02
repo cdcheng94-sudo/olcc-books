@@ -13,6 +13,7 @@ import type { Settings } from "@/lib/queries/settings";
 const NAVY    = "#0f2747";
 const GOLD    = "#c8a45c";
 const SUCCESS = "#1f8a5b";
+const DANGER  = "#c0392b";
 const MUTED   = "#6b7689";
 const BORDER  = "#e6e9ef";
 
@@ -137,6 +138,12 @@ export function ReceiptPDF({ receipt, settings }: { receipt: ReceiptRow; setting
             <Text style={styles.totalsKey}>Subtotal</Text>
             <Text style={styles.totalsVal}>{money(receipt.subtotal, currency)}</Text>
           </View>
+          {receipt.discount > 0 ? (
+            <View style={styles.totalsRow}>
+              <Text style={[styles.totalsKey, { color: DANGER }]}>Discount</Text>
+              <Text style={[styles.totalsVal, { color: DANGER }]}>−{money(receipt.discount, currency)}</Text>
+            </View>
+          ) : null}
           {receipt.tax > 0 ? (
             <View style={styles.totalsRow}>
               <Text style={styles.totalsKey}>Tax</Text>

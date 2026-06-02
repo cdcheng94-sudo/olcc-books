@@ -161,6 +161,12 @@ export function InvoicePDF({ invoice, settings }: { invoice: InvoiceRow; setting
             <Text style={styles.totalsKey}>Subtotal</Text>
             <Text style={styles.totalsVal}>{money(invoice.subtotal, currency)}</Text>
           </View>
+          {invoice.discount > 0 ? (
+            <View style={styles.totalsRow}>
+              <Text style={[styles.totalsKey, { color: DANGER }]}>Discount</Text>
+              <Text style={[styles.totalsVal, { color: DANGER }]}>−{money(invoice.discount, currency)}</Text>
+            </View>
+          ) : null}
           {invoice.tax > 0 ? (
             <View style={styles.totalsRow}>
               <Text style={styles.totalsKey}>Tax</Text>

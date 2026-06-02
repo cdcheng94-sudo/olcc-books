@@ -46,6 +46,7 @@ export type InvoiceRow = {
   site_address: string | null;
   items: LineItem[];
   subtotal: number;
+  discount: number;
   tax: number;
   total: number;
   status: InvoiceStatus;
@@ -64,6 +65,7 @@ export type ReceiptRow = {
   customer_address: string | null;
   items: LineItem[];
   subtotal: number;
+  discount: number;
   tax: number;
   total: number;
   payment_method: string;

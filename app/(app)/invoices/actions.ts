@@ -32,16 +32,18 @@ export type InvoiceInput = {
   customer_address?: string;
   site_address?:     string;
   items:             LineItem[];
-  tax:               number;          // absolute amount
+  discount?:         number;          // absolute amount subtracted from subtotal
+  tax:               number;          // absolute amount added after discount
   note?:             string;
 };
 
-function computeTotals(items: LineItem[], tax: number) {
+function computeTotals(items: LineItem[], discount: number, tax: number) {
   const subtotal = items.reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
   return {
     subtotal: +subtotal.toFixed(2),
+    discount: +discount.toFixed(2),
     tax:      +tax.toFixed(2),
-    total:    +(subtotal + tax).toFixed(2),
+    total:    +(subtotal - discount + tax).toFixed(2),
   };
 }
 
@@ -55,13 +57,16 @@ function validate(input: InvoiceInput) {
     if (!isFinite(it.qty) || it.qty <= 0)              throw new Error(`Item ${i + 1}: qty must be > 0.`);
     if (!isFinite(it.unit_price) || it.unit_price < 0) throw new Error(`Item ${i + 1}: unit price must be ≥ 0.`);
   }
+  if (input.discount != null && (!isFinite(input.discount) || input.discount < 0)) {
+    throw new Error("Discount must be ≥ 0.");
+  }
 }
 
 export async function createInvoice(input: InvoiceInput): Promise<InvoiceRow> {
   validate(input);
   const supabase = await createClient();
   const number = await nextDocumentNumber(supabase, "invoice");
-  const totals = computeTotals(input.items, input.tax);
+  const totals = computeTotals(input.items, input.discount ?? 0, input.tax);
 
   const { data, error } = await supabase
     .from("invoices")
@@ -89,7 +94,7 @@ export async function createInvoice(input: InvoiceInput): Promise<InvoiceRow> {
 export async function updateInvoice(id: string, input: InvoiceInput): Promise<InvoiceRow> {
   validate(input);
   const supabase = await createClient();
-  const totals = computeTotals(input.items, input.tax);
+  const totals = computeTotals(input.items, input.discount ?? 0, input.tax);
 
   const { data, error } = await supabase
     .from("invoices")
@@ -209,7 +214,8 @@ export async function markInvoicePaid(id: string, paymentMethod: string = "Bank 
 
   if (inv.status === "paid") throw new Error("Invoice is already paid.");
 
-  // Cascade through receipt creation
+  // Cascade through receipt creation (carry over discount + tax so the
+  // receipt shows the same breakdown as the invoice the customer paid)
   const today = new Date().toISOString().slice(0, 10);
   const receipt = await createReceipt({
     date:              today,
@@ -217,6 +223,7 @@ export async function markInvoicePaid(id: string, paymentMethod: string = "Bank 
     customer_email:    inv.customer_email   || undefined,
     customer_address:  inv.customer_address || undefined,
     items:             inv.items,
+    discount:          inv.discount,
     tax:               inv.tax,
     payment_method:    paymentMethod,
     linked_invoice_id: inv.id,

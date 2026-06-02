@@ -28,6 +28,7 @@ export function ReceiptFormModal({ open, onOpenChange, onSaved }: Props) {
   const [customerEmail,   setCustomerEmail]   = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
   const [items,           setItems]           = useState<DraftItem[]>([newItem()]);
+  const [discount,        setDiscount]        = useState("0");
   const [tax,             setTax]             = useState("0");
   const [paymentMethod,   setPaymentMethod]   = useState<string>("Bank Transfer");
   const [category,        setCategory]        = useState<string>("Service Income");
@@ -39,7 +40,7 @@ export function ReceiptFormModal({ open, onOpenChange, onSaved }: Props) {
     setError(null);
     setDate(todayIso());
     setCustomerName(""); setCustomerEmail(""); setCustomerAddress("");
-    setItems([newItem()]); setTax("0");
+    setItems([newItem()]); setDiscount("0"); setTax("0");
     setPaymentMethod("Bank Transfer"); setCategory("Service Income");
   }, [open]);
 
@@ -54,9 +55,10 @@ export function ReceiptFormModal({ open, onOpenChange, onSaved }: Props) {
     const unit = Number(it.unit_price) || 0;
     return { desc: it.desc, qty, unit_price: unit, amount: +(qty * unit).toFixed(2) };
   });
-  const subtotal = computedItems.reduce((s, it) => s + it.amount, 0);
-  const taxNum   = Number(tax) || 0;
-  const total    = subtotal + taxNum;
+  const subtotal    = computedItems.reduce((s, it) => s + it.amount, 0);
+  const discountNum = Number(discount) || 0;
+  const taxNum      = Number(tax) || 0;
+  const total       = subtotal - discountNum + taxNum;
 
   function save() {
     setError(null);
@@ -68,6 +70,7 @@ export function ReceiptFormModal({ open, onOpenChange, onSaved }: Props) {
           customer_email:   customerEmail   || undefined,
           customer_address: customerAddress || undefined,
           items:            computedItems,
+          discount:         discountNum,
           tax:              taxNum,
           payment_method:   paymentMethod,
           category_for_income: category,
@@ -145,12 +148,19 @@ export function ReceiptFormModal({ open, onOpenChange, onSaved }: Props) {
           </div>
 
           <div className="grid grid-cols-2 gap-3 items-end">
-            <div className="flex flex-col gap-1">
-              <Label className="text-xs">{t.receipt.formTax}</Label>
-              <Input type="number" step="0.01" min="0" value={tax} onChange={(e) => setTax(e.target.value)} />
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs">{t.receipt.formDiscount}</Label>
+                <Input type="number" step="0.01" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs">{t.receipt.formTax}</Label>
+                <Input type="number" step="0.01" min="0" value={tax} onChange={(e) => setTax(e.target.value)} />
+              </div>
             </div>
             <div className="bg-muted/30 rounded-md p-3 text-sm">
               <div className="flex justify-between"><span className="text-muted-foreground">{t.receipt.formSubtotal}</span><span className="tabular-nums">{fmtMoney(subtotal)}</span></div>
+              {discountNum > 0 && <div className="flex justify-between"><span className="text-muted-foreground">{t.receipt.formDiscount}</span><span className="tabular-nums text-destructive">−{fmtMoney(discountNum)}</span></div>}
               {taxNum > 0 && <div className="flex justify-between"><span className="text-muted-foreground">{t.receipt.formTaxLabel}</span><span className="tabular-nums">{fmtMoney(taxNum)}</span></div>}
               <div className="flex justify-between border-t border-border mt-2 pt-2 font-bold"><span>{t.receipt.formReceived}</span><span className="tabular-nums text-success">{fmtMoney(total)}</span></div>
             </div>

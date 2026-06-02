@@ -31,6 +31,7 @@ export type EduFlowOnboardInput = {
   monthly_override?:    number;
   setup_override?:      number;
   first_month_free:     boolean;
+  discount?:            number;       // signing-day discount applied to setup invoice
 };
 
 /** Add one month to an ISO date, clamping day-of-month (Jan 31 → Feb 28). */
@@ -96,6 +97,7 @@ export async function onboardEduFlowCustomer(input: EduFlowOnboardInput): Promis
     customer_email:   input.customer_email,
     customer_address: input.customer_address,
     items,
+    discount:         input.discount && input.discount > 0 ? +input.discount.toFixed(2) : 0,
     tax:              0,
     note:             `EduFlow ${plan.label} plan — recurring subscription tracked separately.${input.first_month_free ? " First month is complimentary." : ""}`,
   });

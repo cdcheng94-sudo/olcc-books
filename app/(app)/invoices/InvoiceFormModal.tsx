@@ -37,6 +37,7 @@ export function InvoiceFormModal({ open, onOpenChange, editing, onSaved }: Props
   const [customerAddress, setCustomerAddress] = useState("");
   const [siteAddress,     setSiteAddress]     = useState("");
   const [items,           setItems]           = useState<DraftItem[]>([newItem()]);
+  const [discount,        setDiscount]        = useState("0");
   const [tax,             setTax]             = useState("0");
   const [note,            setNote]            = useState("");
   const [error,           setError]           = useState<string | null>(null);
@@ -55,13 +56,14 @@ export function InvoiceFormModal({ open, onOpenChange, editing, onSaved }: Props
       setItems(editing.items.length > 0
         ? editing.items.map((it) => ({ desc: it.desc, qty: String(it.qty), unit_price: String(it.unit_price) }))
         : [newItem()]);
+      setDiscount(String(editing.discount ?? 0));
       setTax(String(editing.tax));
       setNote(editing.note || "");
     } else {
       setDate(todayIso());
       setDueDate(plusDays(todayIso(), 30));
       setCustomerName(""); setCustomerEmail(""); setCustomerAddress(""); setSiteAddress("");
-      setItems([newItem()]); setTax("0"); setNote("");
+      setItems([newItem()]); setDiscount("0"); setTax("0"); setNote("");
     }
   }, [open, editing]);
 
@@ -77,9 +79,10 @@ export function InvoiceFormModal({ open, onOpenChange, editing, onSaved }: Props
     const amt   = +(qty * unit).toFixed(2);
     return { desc: it.desc, qty, unit_price: unit, amount: amt };
   });
-  const subtotal = computedItems.reduce((sum, it) => sum + it.amount, 0);
-  const taxNum   = Number(tax) || 0;
-  const total    = subtotal + taxNum;
+  const subtotal    = computedItems.reduce((sum, it) => sum + it.amount, 0);
+  const discountNum = Number(discount) || 0;
+  const taxNum      = Number(tax) || 0;
+  const total       = subtotal - discountNum + taxNum;
 
   function save() {
     setError(null);
@@ -92,6 +95,7 @@ export function InvoiceFormModal({ open, onOpenChange, editing, onSaved }: Props
           customer_address: customerAddress || undefined,
           site_address:     siteAddress     || undefined,
           items: computedItems,
+          discount: discountNum,
           tax: taxNum,
           note: note || undefined,
         };
@@ -169,12 +173,19 @@ export function InvoiceFormModal({ open, onOpenChange, editing, onSaved }: Props
           </div>
 
           <div className="grid grid-cols-2 gap-3 items-end">
-            <div className="flex flex-col gap-1">
-              <Label className="text-xs">{t.invoice.formTax}</Label>
-              <Input type="number" step="0.01" min="0" value={tax} onChange={(e) => setTax(e.target.value)} />
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs">{t.invoice.formDiscount}</Label>
+                <Input type="number" step="0.01" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs">{t.invoice.formTax}</Label>
+                <Input type="number" step="0.01" min="0" value={tax} onChange={(e) => setTax(e.target.value)} />
+              </div>
             </div>
             <div className="bg-muted/30 rounded-md p-3 text-sm">
               <div className="flex justify-between"><span className="text-muted-foreground">{t.invoice.formSubtotal}</span><span className="tabular-nums">{fmtMoney(subtotal)}</span></div>
+              {discountNum > 0 && <div className="flex justify-between"><span className="text-muted-foreground">{t.invoice.formDiscount}</span><span className="tabular-nums text-destructive">−{fmtMoney(discountNum)}</span></div>}
               {taxNum > 0 && <div className="flex justify-between"><span className="text-muted-foreground">{t.invoice.formTaxLabel}</span><span className="tabular-nums">{fmtMoney(taxNum)}</span></div>}
               <div className="flex justify-between border-t border-border mt-2 pt-2 font-bold"><span>{t.invoice.formTotal}</span><span className="tabular-nums text-navy">{fmtMoney(total)}</span></div>
             </div>

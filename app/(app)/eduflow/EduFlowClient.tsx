@@ -30,6 +30,7 @@ export function EduFlowClient() {
   const [startDate,       setStartDate]       = useState(todayIso());
   const [monthlyOverride, setMonthlyOverride] = useState("");
   const [setupOverride,   setSetupOverride]   = useState("");
+  const [discount,        setDiscount]        = useState("");
   const [firstFree,       setFirstFree]       = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -37,13 +38,15 @@ export function EduFlowClient() {
   const plan = EDUFLOW_PLANS[planKey];
   const monthlyEff = useMemo(() => Number(monthlyOverride || plan.monthly), [monthlyOverride, plan.monthly]);
   const setupEff   = useMemo(() => Number(setupOverride   || plan.setup),   [setupOverride,   plan.setup]);
+  const discountEff = useMemo(() => Math.max(0, Number(discount) || 0), [discount]);
   const firstFreeEff = firstFree ?? plan.firstMonthFree;
-  const firstInvoiceTotal = setupEff + (firstFreeEff ? 0 : monthlyEff);
+  const firstInvoiceTotal = setupEff + (firstFreeEff ? 0 : monthlyEff) - discountEff;
 
   function pickPlan(k: EduFlowPlanKey) {
     setPlanKey(k);
     setMonthlyOverride("");
     setSetupOverride("");
+    setDiscount("");
     setFirstFree(null);
   }
 
@@ -62,6 +65,7 @@ export function EduFlowClient() {
           monthly_override: monthlyOverride ? Number(monthlyOverride) : undefined,
           setup_override:   setupOverride   ? Number(setupOverride)   : undefined,
           first_month_free: firstFreeEff,
+          discount:         discountEff > 0 ? discountEff : undefined,
         });
         alert(interp(t.eduflow.successTemplate, {
           name:         customerName,
@@ -209,6 +213,19 @@ export function EduFlowClient() {
                 placeholder={`${t.eduflow.formDefaultPrefix}${plan.setup}`}
               />
             </div>
+            <div className="md:col-span-2 flex flex-col gap-1">
+              <Label className="text-xs">
+                {t.eduflow.formDiscount} <span className="text-muted-foreground">{t.eduflow.formDiscountHint}</span>
+              </Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={discount}
+                onChange={(e) => setDiscount(e.target.value)}
+                placeholder="0"
+              />
+            </div>
 
             <div className="md:col-span-2 bg-muted/30 rounded-md p-4 text-sm">
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold mb-2">{t.eduflow.summaryWillInclude}</div>
@@ -226,6 +243,12 @@ export function EduFlowClient() {
                 <div className="flex justify-between text-xs text-success">
                   <span>{interp(t.eduflow.summaryFirstMonth, { plan: plan.label })}</span>
                   <span className="font-bold">{t.eduflow.summaryFree}</span>
+                </div>
+              )}
+              {discountEff > 0 && (
+                <div className="flex justify-between text-xs text-destructive">
+                  <span>{t.eduflow.summaryDiscount}</span>
+                  <span className="tabular-nums font-bold">−{fmtMoney(discountEff)}</span>
                 </div>
               )}
               <div className="flex justify-between border-t border-border mt-2 pt-2 text-sm font-bold">
