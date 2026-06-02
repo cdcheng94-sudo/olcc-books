@@ -10,9 +10,23 @@ export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
   title: "OLCC Books",
   description: "OLCC Technology Sdn Bhd internal bookkeeping system.",
-  // No explicit `icons` field — Next.js auto-detects app/icon.png and emits
-  // the right <link rel="icon"> tag, sized for both the browser tab and
-  // mobile home-screen.
+
+  // Explicit icon + manifest references. Files live in /public so the URLs
+  // stay stable (the app/icon convention hashes the URL, which is fine
+  // for the browser tab but breaks manifest references). Both /icon.png
+  // and /apple-icon.png are the same OLCC circle logo at high resolution
+  // — browsers handle the rescaling.
+  icons: {
+    icon: [
+      { url: "/icon.png", sizes: "any",     type: "image/png" },
+      { url: "/icon.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+    shortcut: [{ url: "/icon.png", type: "image/png" }],
+  },
 };
 
 export default function RootLayout({
