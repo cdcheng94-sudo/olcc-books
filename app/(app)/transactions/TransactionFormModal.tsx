@@ -15,14 +15,24 @@ import type { TransactionRow } from "@/lib/types";
 import { createTransaction, updateTransaction } from "./actions";
 import { useLang } from "@/components/LangProvider";
 
+export type TxPrefill = {
+  date?:     string;
+  type?:     TransactionType;
+  category?: string;
+  amount?:   number;
+  party?:    string;
+  note?:     string;
+};
+
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editing: TransactionRow | null;
+  prefill?: TxPrefill | null;     // pre-fill new entries (e.g. from OCR scan)
   onSaved: (row: TransactionRow) => void;
 };
 
-export function TransactionFormModal({ open, onOpenChange, editing, onSaved }: Props) {
+export function TransactionFormModal({ open, onOpenChange, editing, prefill, onSaved }: Props) {
   const { t } = useLang();
   const [date,     setDate]     = useState(todayIso());
   const [type,     setType]     = useState<TransactionType>("expense");
@@ -51,15 +61,15 @@ export function TransactionFormModal({ open, onOpenChange, editing, onSaved }: P
       setNote(editing.note || "");
       setExistingReceiptUrl(editing.receipt_url || "");
     } else {
-      setDate(todayIso());
-      setType("expense");
-      setCategory("Other Expense");
-      setAmount("");
-      setParty("");
-      setNote("");
+      setDate(prefill?.date              ?? todayIso());
+      setType(prefill?.type              ?? "expense");
+      setCategory(prefill?.category      ?? "Other Expense");
+      setAmount(prefill?.amount != null ? String(prefill.amount) : "");
+      setParty(prefill?.party            ?? "");
+      setNote(prefill?.note              ?? "");
       setExistingReceiptUrl("");
     }
-  }, [open, editing]);
+  }, [open, editing, prefill]);
 
   // When type changes, snap to the first category of that type so we don't
   // end up with an income category on an expense entry.

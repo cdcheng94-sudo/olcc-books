@@ -101,21 +101,21 @@ export function EduFlowClient() {
               className={
                 "text-left rounded-xl transition-all p-5 relative overflow-hidden " +
                 (selected
-                  ? "border-2 border-navy bg-navy/[0.04] shadow-xl ring-4 ring-navy/15 -translate-y-0.5"
+                  ? "border-2 border-gold bg-gold/[0.08] shadow-lg ring-4 ring-gold/25"
                   : "border-2 border-border bg-card hover:border-gold/60 hover:shadow-sm")
               }
             >
-              {/* navy top strip on selected for unmistakable visual */}
-              {selected && <div className="absolute top-0 left-0 right-0 h-1.5 bg-navy" />}
+              {/* gold top strip on selected card */}
+              {selected && <div className="absolute top-0 left-0 right-0 h-1.5 bg-gold" />}
               {isPro && (
                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gold text-primary-deep text-[10px] font-bold tracking-wider px-3 py-0.5 rounded-full uppercase">
                   Most popular
                 </span>
               )}
               <div className="flex items-center gap-1.5 mb-1">
-                <div className={"text-base font-bold " + (selected ? "text-navy" : "text-navy")}>{p.label}</div>
+                <div className="text-base font-bold text-navy">{p.label}</div>
                 {selected && (
-                  <span className="ml-auto bg-navy text-white rounded-full w-5 h-5 flex items-center justify-center">
+                  <span className="ml-auto bg-gold text-primary-deep rounded-full w-5 h-5 flex items-center justify-center">
                     <Check size={12} strokeWidth={3} />
                   </span>
                 )}

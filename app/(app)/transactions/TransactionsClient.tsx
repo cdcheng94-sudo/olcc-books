@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { Plus, Pencil, Trash2, ChevronDown } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { Plus, Pencil, Trash2, ScanLine } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import { fmtDate, fmtMoney, isoMonth } from "@/lib/format";
 import { CATEGORIES } from "@/lib/categories";
 import type { TransactionRow } from "@/lib/types";
 import { deleteTransaction } from "./actions";
-import { TransactionFormModal } from "./TransactionFormModal";
+import { TransactionFormModal, type TxPrefill } from "./TransactionFormModal";
 
 type Filters = {
   yearMonth: string;        // "" means All time
@@ -29,8 +29,11 @@ export function TransactionsClient({ initialRows }: { initialRows: TransactionRo
     category: "",
   });
   const [editing, setEditing] = useState<TransactionRow | null>(null);
+  const [prefill, setPrefill] = useState<TxPrefill | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [scanning, setScanning] = useState(false);
+  const scanInputRef = useRef<HTMLInputElement>(null);
 
   // Re-fetch rows whenever filters change. Client-side query against Supabase
   // (RLS allows authenticated users to read).
@@ -54,12 +57,39 @@ export function TransactionsClient({ initialRows }: { initialRows: TransactionRo
 
   function openNew() {
     setEditing(null);
+    setPrefill(null);
     setModalOpen(true);
   }
 
   function openEdit(row: TransactionRow) {
     setEditing(row);
+    setPrefill(null);
     setModalOpen(true);
+  }
+
+  function pickScanFile() {
+    scanInputRef.current?.click();
+  }
+
+  async function onScanFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = "";   // reset so picking the same file again re-fires
+    if (!f) return;
+    setScanning(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", f);
+      const res = await fetch("/api/ocr/parse-receipt", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error || "Scan failed");
+      setEditing(null);
+      setPrefill(json.parsed as TxPrefill);
+      setModalOpen(true);
+    } catch (err) {
+      alert("Scan failed: " + (err as Error).message);
+    } finally {
+      setScanning(false);
+    }
   }
 
   function onSaved(saved: TransactionRow) {
@@ -100,10 +130,30 @@ export function TransactionsClient({ initialRows }: { initialRows: TransactionRo
         <div className="text-sm text-muted-foreground">
           {rows.length} {rows.length === 1 ? "entry" : "entries"}
         </div>
-        <Button onClick={openNew} className="bg-navy hover:bg-navy-light text-white">
-          <Plus className="w-4 h-4 mr-1" />
-          {t.tx.income} / {t.tx.expense}
-        </Button>
+        <div className="flex items-center gap-2">
+          <input
+            ref={scanInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={onScanFile}
+            className="hidden"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={pickScanFile}
+            disabled={scanning}
+            className="border-gold text-navy hover:bg-gold/10"
+          >
+            <ScanLine className="w-4 h-4 mr-1" />
+            {scanning ? "Scanning…" : "Scan receipt"}
+          </Button>
+          <Button onClick={openNew} className="bg-navy hover:bg-navy-light text-white">
+            <Plus className="w-4 h-4 mr-1" />
+            {t.tx.income} / {t.tx.expense}
+          </Button>
+        </div>
       </div>
 
       {/* filters */}
@@ -220,6 +270,7 @@ export function TransactionsClient({ initialRows }: { initialRows: TransactionRo
         open={modalOpen}
         onOpenChange={setModalOpen}
         editing={editing}
+        prefill={prefill}
         onSaved={onSaved}
       />
     </div>
