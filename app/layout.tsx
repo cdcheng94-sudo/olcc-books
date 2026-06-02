@@ -10,9 +10,9 @@ export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
   title: "OLCC Books",
   description: "OLCC Technology Sdn Bhd internal bookkeeping system.",
-  icons: {
-    icon: "https://raw.githubusercontent.com/cdcheng94-sudo/olcc-assets-circle-png/main/olcc-logo-circle.png",
-  },
+  // No explicit `icons` field — Next.js auto-detects app/icon.png and emits
+  // the right <link rel="icon"> tag, sized for both the browser tab and
+  // mobile home-screen.
 };
 
 export default function RootLayout({
