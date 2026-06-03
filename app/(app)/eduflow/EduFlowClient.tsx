@@ -38,9 +38,11 @@ export function EduFlowClient() {
   const plan = EDUFLOW_PLANS[planKey];
   const monthlyEff = useMemo(() => Number(monthlyOverride || plan.monthly), [monthlyOverride, plan.monthly]);
   const setupEff   = useMemo(() => Number(setupOverride   || plan.setup),   [setupOverride,   plan.setup]);
-  const discountEff = useMemo(() => Math.max(0, Number(discount) || 0), [discount]);
+  const discountPct = useMemo(() => Math.min(100, Math.max(0, Number(discount) || 0)), [discount]);
   const firstFreeEff = firstFree ?? plan.firstMonthFree;
-  const firstInvoiceTotal = setupEff + (firstFreeEff ? 0 : monthlyEff) - discountEff;
+  const grossInvoice = setupEff + (firstFreeEff ? 0 : monthlyEff);
+  const discountAmt  = grossInvoice * (discountPct / 100);
+  const firstInvoiceTotal = grossInvoice - discountAmt;
 
   function pickPlan(k: EduFlowPlanKey) {
     setPlanKey(k);
@@ -65,7 +67,7 @@ export function EduFlowClient() {
           monthly_override: monthlyOverride ? Number(monthlyOverride) : undefined,
           setup_override:   setupOverride   ? Number(setupOverride)   : undefined,
           first_month_free: firstFreeEff,
-          discount:         discountEff > 0 ? discountEff : undefined,
+          discount_percent: discountPct > 0 ? discountPct : undefined,
         });
         alert(interp(t.eduflow.successTemplate, {
           name:         customerName,
@@ -219,8 +221,9 @@ export function EduFlowClient() {
               </Label>
               <Input
                 type="number"
-                step="0.01"
+                step="0.5"
                 min="0"
+                max="100"
                 value={discount}
                 onChange={(e) => setDiscount(e.target.value)}
                 placeholder="0"
@@ -245,10 +248,10 @@ export function EduFlowClient() {
                   <span className="font-bold">{t.eduflow.summaryFree}</span>
                 </div>
               )}
-              {discountEff > 0 && (
+              {discountPct > 0 && (
                 <div className="flex justify-between text-xs text-destructive">
-                  <span>{t.eduflow.summaryDiscount}</span>
-                  <span className="tabular-nums font-bold">−{fmtMoney(discountEff)}</span>
+                  <span>{t.eduflow.summaryDiscount} ({discountPct}%)</span>
+                  <span className="tabular-nums font-bold">−{fmtMoney(discountAmt)}</span>
                 </div>
               )}
               <div className="flex justify-between border-t border-border mt-2 pt-2 text-sm font-bold">

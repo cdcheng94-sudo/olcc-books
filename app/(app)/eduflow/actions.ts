@@ -31,7 +31,8 @@ export type EduFlowOnboardInput = {
   monthly_override?:    number;
   setup_override?:      number;
   first_month_free:     boolean;
-  discount?:            number;       // signing-day discount applied to setup invoice
+  discount_percent?:    number;       // 0–100; applies to BOTH the setup invoice
+                                      // AND the ongoing monthly subscription
 };
 
 /** Add one month to an ISO date, clamping day-of-month (Jan 31 → Feb 28). */
@@ -58,6 +59,13 @@ export async function onboardEduFlowCustomer(input: EduFlowOnboardInput): Promis
   const setup   = +(input.setup_override   ?? plan.setup).toFixed(2);
   if (!isFinite(monthly) || monthly <= 0) throw new Error("Monthly amount must be > 0.");
   if (!isFinite(setup)   || setup   <  0) throw new Error("Setup fee must be ≥ 0.");
+
+  const discountPercent = (() => {
+    const d = Number(input.discount_percent);
+    if (!isFinite(d) || d <= 0) return 0;
+    if (d > 100) throw new Error("Discount must be between 0 and 100%.");
+    return +d.toFixed(2);
+  })();
 
   // ---- Build invoice line items ----
   const items: LineItem[] = [];
@@ -97,9 +105,9 @@ export async function onboardEduFlowCustomer(input: EduFlowOnboardInput): Promis
     customer_email:   input.customer_email,
     customer_address: input.customer_address,
     items,
-    discount:         input.discount && input.discount > 0 ? +input.discount.toFixed(2) : 0,
+    discount_percent: discountPercent,
     tax:              0,
-    note:             `EduFlow ${plan.label} plan — recurring subscription tracked separately.${input.first_month_free ? " First month is complimentary." : ""}`,
+    note:             `EduFlow ${plan.label} plan — recurring subscription tracked separately.${input.first_month_free ? " First month is complimentary." : ""}${discountPercent > 0 ? ` ${discountPercent}% discount applies to every monthly bill.` : ""}`,
   });
 
   // ---- 2. Create Subscription (next charge = start + 1 month) ----
@@ -112,6 +120,7 @@ export async function onboardEduFlowCustomer(input: EduFlowOnboardInput): Promis
       customer_phone:      input.customer_phone,
       service_desc:        `EduFlow ${plan.label} — monthly subscription`,
       amount:              monthly,
+      discount_percent:    discountPercent,
       frequency:           "monthly",
       next_charge_date:    nextCharge,
       remind_days_before:  7,

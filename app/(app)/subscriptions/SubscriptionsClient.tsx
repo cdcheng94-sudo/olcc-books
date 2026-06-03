@@ -48,7 +48,8 @@ export function SubscriptionsClient({ initialRows }: { initialRows: Subscription
 
   function onMarkPaid(row: SubscriptionRow) {
     const freqLabel = row.frequency === "monthly" ? t.common.monthly : row.frequency === "quarterly" ? t.common.quarterly : t.common.yearly;
-    if (!confirm(interp(t.subscriptions.confirmMarkPaid, { amount: fmtMoney(row.amount), freq: freqLabel }))) return;
+    const netDue = +(row.amount * (1 - (row.discount_percent || 0) / 100)).toFixed(2);
+    if (!confirm(interp(t.subscriptions.confirmMarkPaid, { amount: fmtMoney(netDue), freq: freqLabel }))) return;
     startTransition(async () => {
       try {
         const r = await markSubscriptionPaid(row.id);
@@ -114,10 +115,11 @@ export function SubscriptionsClient({ initialRows }: { initialRows: Subscription
                 u === "urgent"             ? "text-destructive font-semibold" :
                 u === "caution"            ? "text-warning"                  :
                                               "text-success";
+              const netDue = +(r.amount * (1 - (r.discount_percent || 0) / 100)).toFixed(2);
               const reminderMsg = interp(t.subscriptions.waMessage, {
                 name:    r.customer_name,
                 service: r.service_desc,
-                amount:  fmtMoney(r.amount),
+                amount:  fmtMoney(netDue),
               });
               return (
                 <tr key={r.id} className="border-t border-border hover:bg-muted/20">
@@ -127,7 +129,17 @@ export function SubscriptionsClient({ initialRows }: { initialRows: Subscription
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{r.service_desc}</td>
                   <td className="px-4 py-3 capitalize">{r.frequency}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{fmtMoney(r.amount)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    {r.discount_percent > 0 ? (
+                      <div className="flex flex-col items-end">
+                        <span className="text-[11px] line-through text-muted-foreground">{fmtMoney(r.amount)}</span>
+                        <span className="font-semibold">{fmtMoney(+(r.amount * (1 - r.discount_percent / 100)).toFixed(2))}</span>
+                        <span className="text-[10px] text-destructive font-semibold">−{r.discount_percent}%</span>
+                      </div>
+                    ) : (
+                      fmtMoney(r.amount)
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <div>{fmtDate(r.next_charge_date)}</div>
                     <div className={"text-xs " + dueColor}>{r.status === "active" ? localizedDaysLabel(days, t) : t.subscriptions.paused}</div>

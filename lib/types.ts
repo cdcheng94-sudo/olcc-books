@@ -46,7 +46,7 @@ export type InvoiceRow = {
   site_address: string | null;
   items: LineItem[];
   subtotal: number;
-  discount: number;
+  discount_percent: number;   // 0–100; applied to subtotal before tax
   tax: number;
   total: number;
   status: InvoiceStatus;
@@ -65,7 +65,7 @@ export type ReceiptRow = {
   customer_address: string | null;
   items: LineItem[];
   subtotal: number;
-  discount: number;
+  discount_percent: number;   // 0–100; applied to subtotal before tax
   tax: number;
   total: number;
   payment_method: string;
@@ -117,7 +117,8 @@ export type SubscriptionRow = {
   customer_email: string | null;
   customer_phone: string | null;     // intl format like "60123456789"
   service_desc: string;
-  amount: number;
+  amount: number;                    // headline price BEFORE discount
+  discount_percent: number;          // 0–100; auto-applied every billing cycle
   frequency: "monthly" | "quarterly" | "yearly";
   next_charge_date: ISODate;
   remind_days_before: number;

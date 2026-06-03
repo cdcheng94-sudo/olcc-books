@@ -25,20 +25,22 @@ export type ReceiptInput = {
   customer_email?:     string;
   customer_address?:   string;
   items:               LineItem[];
-  discount?:           number;          // absolute amount subtracted from subtotal
+  discount_percent?:   number;          // 0–100, applied to subtotal before tax
   tax:                 number;          // absolute amount, not %
   payment_method:      string;
   linked_invoice_id?:  string;
   category_for_income?:string;          // default "Service Income"
 };
 
-function computeTotals(items: LineItem[], discount: number, tax: number) {
-  const subtotal = items.reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
+/** total = subtotal − (subtotal × discount% / 100) + tax */
+function computeTotals(items: LineItem[], discountPercent: number, tax: number) {
+  const subtotal       = items.reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
+  const discountAmount = subtotal * (discountPercent / 100);
   return {
-    subtotal: +subtotal.toFixed(2),
-    discount: +discount.toFixed(2),
-    tax:      +tax.toFixed(2),
-    total:    +(subtotal - discount + tax).toFixed(2),
+    subtotal:         +subtotal.toFixed(2),
+    discount_percent: +discountPercent.toFixed(2),
+    tax:              +tax.toFixed(2),
+    total:            +(subtotal - discountAmount + tax).toFixed(2),
   };
 }
 
@@ -51,8 +53,8 @@ function validate(input: ReceiptInput) {
     if (!isFinite(it.qty) || it.qty <= 0) throw new Error(`Item ${i + 1}: qty must be > 0.`);
     if (!isFinite(it.unit_price) || it.unit_price < 0) throw new Error(`Item ${i + 1}: unit price must be ≥ 0.`);
   }
-  if (input.discount != null && (!isFinite(input.discount) || input.discount < 0)) {
-    throw new Error("Discount must be ≥ 0.");
+  if (input.discount_percent != null && (!isFinite(input.discount_percent) || input.discount_percent < 0 || input.discount_percent > 100)) {
+    throw new Error("Discount must be between 0 and 100%.");
   }
   if (!PAYMENT_METHODS.includes(input.payment_method as never)) {
     throw new Error(`Unknown payment method: ${input.payment_method}`);
@@ -63,7 +65,7 @@ export async function createReceipt(input: ReceiptInput): Promise<ReceiptRow> {
   validate(input);
   const supabase = await createClient();
   const number = await nextDocumentNumber(supabase, "receipt");
-  const totals = computeTotals(input.items, input.discount ?? 0, input.tax);
+  const totals = computeTotals(input.items, input.discount_percent ?? 0, input.tax);
 
   const { data, error } = await supabase
     .from("receipts")

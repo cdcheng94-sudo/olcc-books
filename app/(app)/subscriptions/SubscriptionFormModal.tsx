@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLang } from "@/components/LangProvider";
-import { todayIso } from "@/lib/format";
+import { fmtMoney, todayIso } from "@/lib/format";
 import { FREQUENCIES, type Frequency } from "@/lib/recurring-utils";
 import type { SubscriptionRow } from "@/lib/types";
 import { createSubscription, updateSubscription } from "./actions";
@@ -25,6 +25,7 @@ export function SubscriptionFormModal({ open, onOpenChange, editing, onSaved }: 
   const [customerPhone, setCustomerPhone] = useState("");
   const [serviceDesc, setServiceDesc]     = useState("");
   const [amount, setAmount]               = useState("");
+  const [discount, setDiscount]           = useState("0");
   const [frequency, setFrequency]         = useState<Frequency>("monthly");
   const [nextCharge, setNextCharge]       = useState(todayIso());
   const [remindDays, setRemindDays]       = useState("7");
@@ -41,13 +42,14 @@ export function SubscriptionFormModal({ open, onOpenChange, editing, onSaved }: 
       setCustomerPhone(editing.customer_phone || "");
       setServiceDesc(editing.service_desc);
       setAmount(String(editing.amount));
+      setDiscount(String(editing.discount_percent ?? 0));
       setFrequency(editing.frequency);
       setNextCharge(editing.next_charge_date.substring(0, 10));
       setRemindDays(String(editing.remind_days_before));
       setStatus(editing.status);
     } else {
       setCustomerName(""); setCustomerEmail(""); setCustomerPhone(""); setServiceDesc("");
-      setAmount(""); setFrequency("monthly"); setNextCharge(todayIso());
+      setAmount(""); setDiscount("0"); setFrequency("monthly"); setNextCharge(todayIso());
       setRemindDays("7"); setStatus("active");
     }
   }, [open, editing]);
@@ -62,6 +64,7 @@ export function SubscriptionFormModal({ open, onOpenChange, editing, onSaved }: 
           customer_phone: customerPhone || undefined,
           service_desc: serviceDesc,
           amount: Number(amount),
+          discount_percent: Math.min(100, Math.max(0, Number(discount) || 0)),
           frequency,
           next_charge_date: nextCharge,
           remind_days_before: Number(remindDays),
@@ -78,6 +81,10 @@ export function SubscriptionFormModal({ open, onOpenChange, editing, onSaved }: 
     quarterly: t.common.quarterly,
     yearly:    t.common.yearly,
   };
+
+  const amountNum  = Number(amount) || 0;
+  const discountPct = Math.min(100, Math.max(0, Number(discount) || 0));
+  const netAmount  = +(amountNum * (1 - discountPct / 100)).toFixed(2);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -106,6 +113,20 @@ export function SubscriptionFormModal({ open, onOpenChange, editing, onSaved }: 
             <Label className="text-xs">{t.subscriptions.formAmount}</Label>
             <Input type="number" step="0.01" min="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
           </div>
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs">{t.subscriptions.formDiscount}</Label>
+            <Input type="number" step="0.5" min="0" max="100" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+          </div>
+          {discountPct > 0 && amountNum > 0 && (
+            <div className="col-span-2 bg-muted/30 rounded-md px-3 py-2 text-xs flex items-center justify-between">
+              <span className="text-muted-foreground">{t.subscriptions.discountPreview}</span>
+              <span className="tabular-nums">
+                <span className="line-through text-muted-foreground mr-2">{fmtMoney(amountNum)}</span>
+                <span className="text-destructive mr-2">−{discountPct}%</span>
+                <span className="font-bold text-success">{fmtMoney(netAmount)}</span>
+              </span>
+            </div>
+          )}
           <div className="flex flex-col gap-1">
             <Label className="text-xs">{t.subscriptions.formFrequency}</Label>
             <select value={frequency} onChange={(e) => setFrequency(e.target.value as Frequency)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">

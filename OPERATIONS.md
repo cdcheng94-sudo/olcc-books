@@ -41,7 +41,10 @@
    - Phone(国际格式 `60123456789`,以后要 WhatsApp 催费)
    - Address(可选,会出现在 invoice PDF 上)
    - Start date:今天
-4. **检查右下 summary** —— 看 invoice 会包括哪些行 + 总额
+   - **折扣 (%)**(可选):给客户的优惠,**百分比**。填了之后:
+     - 首期 invoice 直接打折
+     - **每月订阅账单都自动打这个折扣**(不用每月手动改)
+4. **检查右下 summary** —— 看 invoice 会包括哪些行 + 折扣 + 总额
 5. 点 **Create invoice + subscription**
 6. ✅ 自动跳到 `/invoices`,新 invoice 就在最上面
 
@@ -63,6 +66,15 @@
   - `/receipts` 自动多一张 **RCP-XXXX** 
   - `/transactions` 自动多一笔 income MYR XXX
   - Dashboard 数字立刻更新
+
+### 💰 关于折扣(Discount)— **百分比制**
+
+任何 invoice / receipt / subscription 都可以设折扣,**用百分比(%),不是固定金额**。
+
+- 开 invoice 时有个 **"折扣 (%)"** 框,填 `10` 就是打 9 折。
+- 计算:`总额 = 小计 − 小计×折扣% + 税`。
+- PDF 上客户看得到 **原价 + 折扣 (10%): −MYR X.XX + 最终金额**,有被折扣到的感觉。
+- **订阅客户(Subscriptions)的折扣是永久的** —— 设一次,以后每个月催费/收款都自动按这个 % 扣,账单每月都显示折扣。
 
 ---
 
@@ -137,10 +149,18 @@ Dashboard "To Collect" 卡片,从上往下按到期紧急度排序。
 - ✓ Mark Paid:客户付了之后点,自动入账 income
 - ⏸ Pause:客户暂停服务时用
 
+### 新增订阅时设折扣
+
+`/subscriptions` → **+ New Subscription** → 表单里:
+- **原价 (MYR)**:服务的标价
+- **折扣 (%,每期自动扣)**:给这个客户的长期优惠,填了之后下面会实时显示 **原价 → −X% → 每期实收**
+- 之后**每个月**催费、收款、PDF 收据都自动按这个折扣算,不用每月手动改
+
 ### 客户付了款
 
 那行点 ✓ (Mark Paid)
-- 自动入账 income MYR XXX (category = Service Income)
+- 自动按折后金额入账 income(category = Service Income)
+- **自动生成一张 RCP-XXXX 收据 + PDF**(客户可邮,PDF 显示原价 + 折扣 + 实付)
 - next_charge_date 推后 1 月
 
 ---

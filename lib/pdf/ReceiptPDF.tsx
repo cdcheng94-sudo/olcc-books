@@ -138,10 +138,10 @@ export function ReceiptPDF({ receipt, settings }: { receipt: ReceiptRow; setting
             <Text style={styles.totalsKey}>Subtotal</Text>
             <Text style={styles.totalsVal}>{money(receipt.subtotal, currency)}</Text>
           </View>
-          {receipt.discount > 0 ? (
+          {receipt.discount_percent > 0 ? (
             <View style={styles.totalsRow}>
-              <Text style={[styles.totalsKey, { color: DANGER }]}>Discount</Text>
-              <Text style={[styles.totalsVal, { color: DANGER }]}>−{money(receipt.discount, currency)}</Text>
+              <Text style={[styles.totalsKey, { color: DANGER }]}>Discount ({receipt.discount_percent}%)</Text>
+              <Text style={[styles.totalsVal, { color: DANGER }]}>−{money(receipt.subtotal * (receipt.discount_percent / 100), currency)}</Text>
             </View>
           ) : null}
           {receipt.tax > 0 ? (

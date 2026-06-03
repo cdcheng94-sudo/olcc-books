@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { advanceDate, FREQUENCIES, type Frequency } from "@/lib/recurring-utils";
 import { todayIso } from "@/lib/format";
+import { createReceipt } from "../receipts/actions";
+import type { SubscriptionRow } from "@/lib/types";
 
 export type SubscriptionInput = {
   id?: string;
@@ -11,20 +13,23 @@ export type SubscriptionInput = {
   customer_email?: string;
   customer_phone?: string;
   service_desc: string;
-  amount: number;
+  amount: number;                 // headline price BEFORE discount
+  discount_percent?: number;      // 0–100; auto-applied each billing cycle
   frequency: Frequency;
-  next_charge_date: string;     // YYYY-MM-DD
+  next_charge_date: string;       // YYYY-MM-DD
   remind_days_before?: number;
   status?: "active" | "paused";
 };
 
-function validate(input: SubscriptionInput): SubscriptionInput {
+function validate(input: SubscriptionInput): Required<Omit<SubscriptionInput, "id" | "customer_email" | "customer_phone">> & Pick<SubscriptionInput, "id" | "customer_email" | "customer_phone"> {
   if (!input.customer_name?.trim())                                              throw new Error("Customer name is required.");
   if (!input.service_desc?.trim())                                               throw new Error("Service description is required.");
   if (!input.next_charge_date || !/^\d{4}-\d{2}-\d{2}$/.test(input.next_charge_date)) throw new Error("Valid next-charge date required.");
   if (!FREQUENCIES.includes(input.frequency))                                    throw new Error("Invalid frequency.");
   const amt = Number(input.amount);
   if (!isFinite(amt) || amt <= 0)                                                throw new Error("Amount must be > 0.");
+  const disc = Number(input.discount_percent);
+  if (input.discount_percent != null && (!isFinite(disc) || disc < 0 || disc > 100)) throw new Error("Discount must be between 0 and 100%.");
   const remind = Number(input.remind_days_before);
   return {
     id:                 input.id,
@@ -33,6 +38,7 @@ function validate(input: SubscriptionInput): SubscriptionInput {
     customer_phone:     input.customer_phone?.trim() || undefined,
     service_desc:       input.service_desc.trim(),
     amount:             +amt.toFixed(2),
+    discount_percent:   isFinite(disc) && disc >= 0 ? +disc.toFixed(2) : 0,
     frequency:          input.frequency,
     next_charge_date:   input.next_charge_date,
     remind_days_before: isFinite(remind) && remind >= 0 ? remind : 7,
@@ -49,6 +55,7 @@ export async function createSubscription(input: SubscriptionInput) {
     customer_phone: c.customer_phone ?? null,
     service_desc: c.service_desc,
     amount: c.amount,
+    discount_percent: c.discount_percent,
     frequency: c.frequency,
     next_charge_date: c.next_charge_date,
     remind_days_before: c.remind_days_before,
@@ -69,6 +76,7 @@ export async function updateSubscription(id: string, input: SubscriptionInput) {
     customer_phone: c.customer_phone ?? null,
     service_desc: c.service_desc,
     amount: c.amount,
+    discount_percent: c.discount_percent,
     frequency: c.frequency,
     next_charge_date: c.next_charge_date,
     remind_days_before: c.remind_days_before,
@@ -90,30 +98,46 @@ export async function deleteSubscription(id: string) {
 }
 
 /**
- * markSubscriptionPaid — customer paid us. Insert an INCOME Transaction
- * (category Service Income — owner can recategorize on the Transactions
- * page if needed), advance next_charge_date by frequency. Future phase
- * will also auto-generate a Receipt PDF and email it to the customer.
+ * markSubscriptionPaid — customer paid us for this billing cycle.
+ *
+ * As of the discount-% upgrade this goes THROUGH the Receipt cascade
+ * (was: direct transaction insert). That means every cycle now produces
+ * a proper RCP-xxxx receipt + PDF the customer can be emailed, and the
+ * subscription's discount_percent is applied to the headline amount so
+ * the receipt shows "原价 → 折扣 X% → 实付". createReceipt() itself
+ * cascades the income Transaction, so there's still a single source of
+ * truth for cash-in.
+ *
+ * Then advance next_charge_date by the frequency and stamp last_charged.
  */
 export async function markSubscriptionPaid(id: string) {
   const supabase = await createClient();
 
-  const { data: sub, error: e1 } = await supabase
+  const { data: subData, error: e1 } = await supabase
     .from("subscriptions").select("*").eq("id", id).single();
-  if (e1 || !sub) throw new Error("Subscription not found.");
+  if (e1 || !subData) throw new Error("Subscription not found.");
+  const sub = subData as SubscriptionRow;
 
   const today = todayIso();
 
-  const { error: e2 } = await supabase.from("transactions").insert({
-    date:          today,
-    type:          "income",
-    category:      "Service Income",
-    amount:        sub.amount,
-    party:         sub.customer_name,
-    note:          `Subscription: ${sub.service_desc}`,
-    linked_doc_id: sub.id,
+  // Cascade through receipt creation. One line item = the headline price;
+  // the subscription's discount_percent knocks it down to the actual charge.
+  await createReceipt({
+    date:             today,
+    customer_name:    sub.customer_name,
+    customer_email:   sub.customer_email   || undefined,
+    customer_address: undefined,
+    items: [{
+      desc:       sub.service_desc,
+      qty:        1,
+      unit_price: sub.amount,
+      amount:     sub.amount,
+    }],
+    discount_percent: sub.discount_percent ?? 0,
+    tax:              0,
+    payment_method:   "Bank Transfer",
+    category_for_income: "Service Income",
   });
-  if (e2) throw new Error("Failed to record income: " + e2.message);
 
   const next = advanceDate(sub.next_charge_date, sub.frequency as Frequency);
 
@@ -126,5 +150,6 @@ export async function markSubscriptionPaid(id: string) {
   revalidatePath("/subscriptions");
   revalidatePath("/dashboard");
   revalidatePath("/transactions");
+  revalidatePath("/receipts");
   return { ok: true, next_charge_date: next };
 }

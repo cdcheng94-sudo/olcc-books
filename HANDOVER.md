@@ -2,7 +2,7 @@
 
 > 给接手开发/运维的人。当前状态、所有服务、所有 env var、架构决策、已完成、未完成。
 >
-> **最后更新:** 2026-06-02,v2 正式上线。
+> **最后更新:** 2026-06-03,v2 已上线 + 全双语 + Discount(% 制)+ Subscription 折扣每期自动套用。
 
 ---
 
@@ -92,19 +92,30 @@ CRON_SECRET=<32-byte hex>
 | `invoices` | 开给客户的发票 | Mark Paid → 触发 createReceipt |
 | `receipts` | 收据(自动 + 手动) | insert → 自动写一行 income transactions |
 | `recurring` | 我们付的月费 | Mark Paid → 写一行 expense transactions |
-| `subscriptions` | 客户付我们的月费 (v2 新增) | Mark Paid → 写一行 income transactions |
+| `subscriptions` | 客户付我们的月费 (v2 新增) | Mark Paid → 经 Receipt 级联 → income transaction |
 | `claims` | 员工报销 | markPaid → 写一行 expense transactions |
 
 ### 5.1 Cascade 设计核心
 
-`receipts → transactions` 是**唯一的 income 入账路径**(见 `0001_init.sql` line 69-72 注释)。Invoices 永远不直接 insert transactions,而是先开 receipt,让 receipt 的 trigger 入账。这避免 invoice / receipt 双重计数。
+`receipts → transactions` 是**唯一的 income 入账路径**(见 `0001_init.sql` line 69-72 注释)。Invoices 永远不直接 insert transactions,而是先开 receipt,让 receipt cascade 入账。这避免 invoice / receipt 双重计数。
 
 类似地:
 - Claim "paid" → 直接 insert expense transaction(claims 没有中间 receipt)
 - Recurring "paid" → 直接 insert expense transaction
-- Subscription "paid" → 直接 insert income transaction(实际上 Subscription Mark Paid 没走 receipt,留意!)
+- **Subscription "paid" → 经 `createReceipt()` 级联**(discount-% 升级后改的)。每期会生成 RCP-xxxx 收据 + PDF(客户可邮),并应用该订阅的 `discount_percent`。createReceipt 自己再级联 income transaction,所以入账依然单一来源。
 
-> ⚠️ Subscriptions 也应该走 Receipt 路径吗?目前没走,直接写 transaction。如果需要客户拿到 PDF receipt,要改 `app/(app)/subscriptions/actions.ts` 的 `markSubscriptionPaid`,改成 createReceipt 而非直接 insert。**Backlog 项**。
+> ✅ 之前 backlog 里"Subscription Mark Paid 没走 receipt"的隐患已经修掉了(discount-% 升级时一并处理)。
+
+### 5.1.1 Discount(折扣)语义 — **% 制**
+
+**重要:** discount 是**百分比(0–100)**,不是固定金额。
+
+- 存储:`invoices.discount_percent` / `receipts.discount_percent` / `subscriptions.discount_percent`(都是 `numeric(5,2)`,migration `0006`)。
+- 公式:`total = subtotal − (subtotal × discount_percent / 100) + tax`。
+- 渲染时才把 % 换算成金额(`subtotal × pct/100`),所以单一来源是 %。
+- **Subscriptions 的 discount_percent 是持久的** —— 每期 Mark Paid 自动套用,客户每月账单都看到"原价 → 折扣 X% → 实付"。
+- EduFlow onboard 的 discount_percent **同时**写进首期 invoice **和**月度 subscription(给客户的折扣首期 + 每月都生效)。
+- PDF 总额区显示 `Discount (10%): −MYR X.XX`(红色),客户看得到原价和被折扣的额度。
 
 ### 5.2 RLS 策略
 
@@ -183,7 +194,17 @@ olcc-books/
 | 12 | **Settings 自助页**(公司/银行/编号/白名单) | `app/(app)/settings/*` |
 | 10 | **OCR 拍收据 → Gemini → 自动填 transaction** | `app/api/ocr/parse-receipt/route.ts` |
 
-每个 Phase 的 commit message 在 `git log` 里完整写了背景。
+### 上线后追加(Phase 13 之后的 patch,非编号 phase)
+
+| 升级 | 内容 | 关键文件 |
+|---|---|---|
+| 全双语 | 所有弹窗/表单/按钮/确认框/状态徽章 i18n 化(~200 keys) | `lib/i18n.ts` + 18 个 client 组件 |
+| Plan 卡翻译 | EduFlow 三个 plan 的 audience/features/label 双语 | `lib/i18n.ts` `EduFlowClient.tsx` |
+| Manifest + icon | PWA manifest + apple-icon,手机加桌面用公司 logo | `app/manifest.ts` `public/icon.png` |
+| **Discount(金额版)** | invoices/receipts 加固定金额折扣 | `0005_add_discount.sql` |
+| **Discount(% 版)** ← 最新 | 折扣改百分比;Subscriptions 持久折扣每期自动套用;Subscription Mark Paid 改走 Receipt 级联 | `0006_discount_percent.sql` + invoices/receipts/subscriptions/eduflow actions + 两个 PDF + 表单 |
+
+每个 Phase / patch 的 commit message 在 `git log` 里完整写了背景。
 
 ---
 
@@ -222,9 +243,9 @@ Next 16 Cache Components 严格要求 async server component 套 `<Suspense>`。
 React-PDF 完全 Node 端 + 小,puppeteer 要 headless chromium 太大。serverless 函数有 50MB 限制(Hobby),React-PDF 用 `serverExternalPackages` 不打包进 bundle 里能压下来。
 
 ### 9.4 Receipt 是 income 唯一入口
-所有 income 必须经过 Receipt 表(invoice mark paid → cascade receipt → cascade transaction)。
-好处:无双重计数,审计简单。
-坏处:Subscription 当前直接写 transaction,**不一致**,待修。
+所有 income 必须经过 Receipt 表(invoice/subscription mark paid → cascade receipt → cascade transaction)。
+好处:无双重计数,审计简单,客户每次都拿得到 PDF 收据。
+现状:invoices **和** subscriptions 都走 Receipt 路径了(discount-% 升级时统一)。
 
 ### 9.5 Allowed emails 白名单 vs Supabase RLS
 Supabase Google OAuth 任何 Google 账号都能登录,所以加 `allowed_emails` 应用层白名单。layout.tsx 检查;表为空时第一个登录的可以进去(自助 bootstrap)。
@@ -239,18 +260,21 @@ middleware 的 matcher 排除 `api/cron`,否则 Supabase session check 把 cron 
 
 | 项 | 状态 | 优先级 |
 |---|---|---|
-| Subscriptions Mark Paid → 走 Receipt 路径(目前直接写 transaction,不一致) | 待修 | 中 |
 | Resend domain verify(目前沙箱,只能发到 cdcheng94@gmail.com) | 待做 | **客户多了必做** |
 | 自定义 `RESEND_FROM` env 到正式域名 | 待做 | 跟上面捆绑 |
+| Subscription 自动 mark paid(目前到期还是要手动点 ✓;客户真的转账后才点) | 待考虑 | 中 |
+| 自动发 receipt 邮件给客户(目前 mark paid 生成 receipt 但不自动发,要手动点 ✉) | 待做 | 中 |
 | `middleware.ts` deprecation → Next 16 改 `proxy.ts` | Next 16 deprecation warning | 低,不影响功能 |
 | Mark Paid invoice 后,PDF 还显示 DRAFT(因为 pdf_url cache 没失效) | 已知小 bug | 低 |
 | 月度 / 年度报表(P&L) | 没做 | 中 |
 | 数据导出 CSV / Excel | 没做 | 低 |
 | 多公司支持(目前只 OLCC Technology 一家) | 没做 | 长期 |
 | Stripe Checkout 自动收 EduFlow 客户款 | 没做 | 客户达到 20+ 单时上 |
-| EduFlow tenant 状态 dashboard(哪些客户健康/即将到期) | 没做 | 长期 |
+| EduFlow tenant 状态 dashboard(哪些客户健康/即将到期 / MRR) | 没做 | 长期 |
 | Dashboard "Quick Add" 按钮(顶部快捷开 income/expense) | 没做 | 低 |
 | 操作日志 / audit log | 没做 | 中(合规需要) |
+| Discount 可叠加固定金额 + %(目前只 %) | 没做 | 低 |
+| PDF line item 名称中文化(目前 EduFlow line item 永远英文) | 没做 | 低 |
 
 ---
 

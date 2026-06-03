@@ -56,9 +56,10 @@ export function ReceiptFormModal({ open, onOpenChange, onSaved }: Props) {
     return { desc: it.desc, qty, unit_price: unit, amount: +(qty * unit).toFixed(2) };
   });
   const subtotal    = computedItems.reduce((s, it) => s + it.amount, 0);
-  const discountNum = Number(discount) || 0;
+  const discountPct = Math.min(100, Math.max(0, Number(discount) || 0));
+  const discountAmt = subtotal * (discountPct / 100);
   const taxNum      = Number(tax) || 0;
-  const total       = subtotal - discountNum + taxNum;
+  const total       = subtotal - discountAmt + taxNum;
 
   function save() {
     setError(null);
@@ -70,7 +71,7 @@ export function ReceiptFormModal({ open, onOpenChange, onSaved }: Props) {
           customer_email:   customerEmail   || undefined,
           customer_address: customerAddress || undefined,
           items:            computedItems,
-          discount:         discountNum,
+          discount_percent: discountPct,
           tax:              taxNum,
           payment_method:   paymentMethod,
           category_for_income: category,
@@ -151,7 +152,7 @@ export function ReceiptFormModal({ open, onOpenChange, onSaved }: Props) {
             <div className="flex flex-col gap-2">
               <div className="flex flex-col gap-1">
                 <Label className="text-xs">{t.receipt.formDiscount}</Label>
-                <Input type="number" step="0.01" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+                <Input type="number" step="0.5" min="0" max="100" value={discount} onChange={(e) => setDiscount(e.target.value)} />
               </div>
               <div className="flex flex-col gap-1">
                 <Label className="text-xs">{t.receipt.formTax}</Label>
@@ -160,7 +161,7 @@ export function ReceiptFormModal({ open, onOpenChange, onSaved }: Props) {
             </div>
             <div className="bg-muted/30 rounded-md p-3 text-sm">
               <div className="flex justify-between"><span className="text-muted-foreground">{t.receipt.formSubtotal}</span><span className="tabular-nums">{fmtMoney(subtotal)}</span></div>
-              {discountNum > 0 && <div className="flex justify-between"><span className="text-muted-foreground">{t.receipt.formDiscount}</span><span className="tabular-nums text-destructive">−{fmtMoney(discountNum)}</span></div>}
+              {discountPct > 0 && <div className="flex justify-between"><span className="text-muted-foreground">{t.receipt.formDiscountLine.replace("{pct}", String(discountPct))}</span><span className="tabular-nums text-destructive">−{fmtMoney(discountAmt)}</span></div>}
               {taxNum > 0 && <div className="flex justify-between"><span className="text-muted-foreground">{t.receipt.formTaxLabel}</span><span className="tabular-nums">{fmtMoney(taxNum)}</span></div>}
               <div className="flex justify-between border-t border-border mt-2 pt-2 font-bold"><span>{t.receipt.formReceived}</span><span className="tabular-nums text-success">{fmtMoney(total)}</span></div>
             </div>

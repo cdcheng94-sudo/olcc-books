@@ -131,7 +131,7 @@ export function DashboardClient({ summary, toPay, toCollect, trend, byCategory, 
                           <div className="text-xs text-muted-foreground truncate">{s.service_desc}</div>
                         </div>
                         <div className="text-right shrink-0 ml-3">
-                          <div className="font-bold text-sm tabular-nums">{fmtMoney(s.amount)}</div>
+                          <div className="font-bold text-sm tabular-nums">{fmtMoney(+(s.amount * (1 - (s.discount_percent || 0) / 100)).toFixed(2))}</div>
                           <div className={`text-[11px] font-semibold ${u.text}`}>{localizedDaysLabel(s.days_until_due, t)}</div>
                         </div>
                       </div>
