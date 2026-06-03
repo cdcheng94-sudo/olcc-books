@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getReminderCount } from "@/lib/queries/reminders";
 import { Shell } from "@/components/Shell";
 
 /**
@@ -57,5 +58,7 @@ export default async function AppShellLayout({
     }
   }
 
-  return <Shell userEmail={email}>{children}</Shell>;
+  const reminderCount = await getReminderCount(supabase);
+
+  return <Shell userEmail={email} reminderCount={reminderCount}>{children}</Shell>;
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { Bell, Globe, LogOut, Menu } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,7 @@ const TITLE_KEYS: Record<string, keyof Dict["nav"]> = {
   "/settings":      "settings",
 };
 
-export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
+export function TopBar({ onMenuClick, reminderCount = 0 }: { onMenuClick?: () => void; reminderCount?: number }) {
   const { t, lang, toggle } = useLang();
   const pathname = usePathname();
 
@@ -64,9 +65,19 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
           <Globe size={14} />
           {lang === "zh" ? "EN" : "中文"}
         </button>
-        <div className="relative hidden sm:block">
-          <Bell size={20} className="text-muted-foreground" />
-        </div>
+        <Link
+          href="/dashboard"
+          className="relative flex items-center justify-center w-9 h-9 rounded-md hover:bg-accent transition-colors"
+          aria-label={`Reminders${reminderCount > 0 ? ` (${reminderCount})` : ""}`}
+          title={reminderCount > 0 ? `${reminderCount}` : undefined}
+        >
+          <Bell size={20} className={reminderCount > 0 ? "text-navy" : "text-muted-foreground"} />
+          {reminderCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 bg-destructive text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center leading-none">
+              {reminderCount > 9 ? "9+" : reminderCount}
+            </span>
+          )}
+        </Link>
         <Button
           variant="ghost"
           size="sm"
