@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Sidebar } from "@/components/Sidebar";
-import { TopBar } from "@/components/TopBar";
+import { Shell } from "@/components/Shell";
 
 /**
  * Shell for all authenticated app pages. Wraps every route under app/(app)/
@@ -58,15 +57,5 @@ export default async function AppShellLayout({
     }
   }
 
-  return (
-    <div className="min-h-svh bg-background flex">
-      <Sidebar userEmail={email} />
-      <div className="flex-1 md:ml-60 flex flex-col">
-        <TopBar />
-        <main className="flex-1 px-6 md:px-7 py-7 max-w-[1180px] w-full mx-auto">
-          {children}
-        </main>
-      </div>
-    </div>
-  );
+  return <Shell userEmail={email}>{children}</Shell>;
 }

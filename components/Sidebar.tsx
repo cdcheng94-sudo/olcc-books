@@ -33,12 +33,36 @@ const NAV: { href: string; key: keyof Dict["nav"]; Icon: React.ComponentType<{ s
   { href: "/settings",      key: "settings",      Icon: SettingsIcon },
 ];
 
-export function Sidebar({ userEmail }: { userEmail?: string | null }) {
+type SidebarProps = {
+  userEmail?: string | null;
+  mobileOpen?: boolean;
+  onClose?: () => void;
+};
+
+export function Sidebar({ userEmail, mobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { t } = useLang();
 
   return (
-    <aside className="hidden md:flex fixed left-0 top-0 h-screen w-60 flex-col bg-primary text-white shadow-[2px_0_20px_rgba(15,39,71,0.15)] z-40">
+    <>
+      {/* backdrop (mobile only, when drawer open) */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 md:hidden"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+
+      <aside
+        className={[
+          "fixed left-0 top-0 h-screen w-60 flex flex-col bg-primary text-white",
+          "shadow-[2px_0_20px_rgba(15,39,71,0.15)] z-50",
+          "transition-transform duration-200 ease-out",
+          mobileOpen ? "translate-x-0" : "-translate-x-full",
+          "md:translate-x-0 md:z-40",
+        ].join(" ")}
+      >
       {/* brand block */}
       <div className="px-5 py-6 border-b border-primary-light">
         <div className="flex items-center gap-3">
@@ -68,6 +92,7 @@ export function Sidebar({ userEmail }: { userEmail?: string | null }) {
             <Link
               key={href}
               href={href}
+              onClick={onClose}
               className={[
                 "flex items-center gap-3 px-3.5 py-2.5 mb-1 rounded-lg text-sm transition-colors",
                 "border-l-[3px]",
@@ -94,6 +119,7 @@ export function Sidebar({ userEmail }: { userEmail?: string | null }) {
           </div>
         </div>
       )}
-    </aside>
+      </aside>
+    </>
   );
 }
