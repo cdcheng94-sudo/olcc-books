@@ -46,9 +46,9 @@
 - **To Collect**(客户要付我们的)+ **To Pay**(我们要付的),按到期紧急度排序、颜色区分
 
 ### 3.2 Transactions(收支记录)
-- 手动记 income / expense,可附收据图
+- 手动记交易,**7 种类型**(见 §6 资本池),可附收据图
 - **OCR 拍收据自动填**(Gemini)
-- 月份 / 类型 / 分类 筛选
+- 月份 / 类型(多选)/ 分类 筛选,6 色 type badge
 
 ### 3.3 Invoices(发票)
 - 完整 CRUD,生命周期 Draft → Sent → Paid
@@ -80,7 +80,12 @@
 - pending → approved → paid 工作流
 - Mark Paid → 自动入账 expense
 
-### 3.9 Settings(公司设置)
+### 3.9 Capital(资本)— **新模块,见 §6**
+- 把"股东资金"和"经营资金"分成两个资金池
+- 追踪股东借款 / 股本 / 还款 / 利息 / 资本性支出
+- 只读报表页,所有录入在 Transactions
+
+### 3.10 Settings(公司设置)
 - 改公司资料 / 银行 info / 发票编号 / 货币 / 税率
 - 管理登录白名单(加/删团队成员)
 
@@ -130,7 +135,48 @@
 
 ---
 
-## 6. 数据流核心设计
+## 6. 资本池:股东资金 vs 经营资金(重要,刚加)
+
+> ⚠️ 这是为了**税务正确**做的:股东借钱给公司周转(Director's Loan)、股本、还款等**不是收入也不是经营支出**,必须独立于 P&L 之外,否则会被错算进利润交税。
+
+### 6.1 交易现在有 7 种类型
+
+| 类型 | 性质 | 影响 |
+|---|---|---|
+| `income` 经营收入 | 经营 | Operating Pool ↑,**进 P&L** |
+| `expense` 经营支出 | 经营 | Operating Pool ↓,**进 P&L** |
+| `shareholder_loan` 股东借款 | 资本(债) | Capital Pool ↑,**不进 P&L**;要还、可能有利息 |
+| `capital_injection` 资本注入/股本 | 资本(股权) | Capital Pool ↑,**不进 P&L**;不还、影响股权 |
+| `capital_expense` 资本性支出 | 资本 | Capital Pool ↓,**不进 P&L** |
+| `loan_repayment` 股东还款 | 资本 | Capital Pool ↓,**不进 P&L** |
+| `interest_paid` 付利息 | 经营 ⚠️ | **Operating Pool ↓**,**进 P&L**(利息可税前扣除) |
+
+> 🔑 **最易错点:付利息虽然给股东,但算经营成本 → 扣 Operating Pool + 进 P&L;只有还本金(loan_repayment)扣 Capital Pool。**
+
+### 6.2 资金池公式
+
+```
+Capital Pool   = 股东借款 + 股本 − 资本性支出 − 还款
+Operating Pool = 收入 − 支出 − 付利息
+公司总可用资金  = Capital Pool + Operating Pool
+```
+
+### 6.3 借款 vs 股本(刚拆分)
+
+- **股东借款(loan)**:是债,要还,会累积"未还余额(Outstanding)",可能有利息,**不影响股权**
+- **股本(equity / capital injection)**:是股权,公司不还,无利息,**不算 Outstanding**,影响持股
+- 每个股东一个"往来账":`Outstanding = 借款 − 还款`(股本不算)
+- 护栏:还款不能超过该股东 Outstanding(防止凭空还款)
+
+### 6.4 /capital 页面(只读报表)
+
+- 顶部 3 卡:Total Borrowed(借款)/ Total Repaid(还款)/ Outstanding(未还)
+- 6 个 tab:股东借款 / 资本注入(股本)/ 还款 / 资本性支出 / 利息 / 按股东汇总
+- 所有录入在 /transactions 完成,/capital 只看
+
+---
+
+## 7. 数据流核心设计
 
 ```
 收入(income)唯一入账路径:
@@ -142,17 +188,20 @@
   手动 Transaction(可 OCR)
   Recurring  ──Mark Paid──▶ expense transaction
   Claim      ──Mark Paid──▶ expense transaction
+
+资本类(不进 P&L):直接在 /transactions 录,无级联
 ```
 
 所有 income 必经 Receipt → 无双重计数,审计简单,客户每次都拿得到 PDF 收据。
 
 ---
 
-## 7. 已完成(全部上线)
+## 8. 已完成(全部上线)
 
-- ✅ 9 个功能模块(上面 §3 全部)
-- ✅ 中英双语(所有页面/弹窗/按钮/确认框,~200 翻译键)
+- ✅ 10 个功能模块(上面 §3 全部,含资本池)
+- ✅ 中英双语(所有页面/弹窗/按钮/确认框,~230 翻译键)
 - ✅ Discount(% 制)+ Subscription 折扣每期自动套用
+- ✅ **资本/经营双资金池 + 股东借款/股本拆分**(税务正确)
 - ✅ PDF 生成 + 邮件发送
 - ✅ OCR 拍收据
 - ✅ 每日自动催费邮件(Cron)
@@ -162,11 +211,13 @@
 
 ---
 
-## 8. 待讨论 / 开放问题(拿去 chat 重点看这里)
+## 9. 待讨论 / 开放问题(拿去 chat 重点看这里)
 
 | 项 | 现状 | 备注 |
 |---|---|---|
 | **Resend 域名验证** | 沙箱模式,只能发到 cdcheng94@gmail.com | 客户多了**必须**先 verify 一个公司域名才能群发真客户 |
+| **利息自动计算** | interest_rate 字段存了但不算,利息靠手动录 | 要不要按借款利率 + 期间自动算应付利息? |
+| **资本性支出护栏** | 没限制(Capital Pool 可被花成负) | 要不要加"别超支 Capital Pool"提醒? |
 | **Subscription 自动收款** | 到期还是手动点 Mark Paid(客户真转账后才点) | 要不要接 Stripe 自动收款?门槛:Stripe MY 商户号 + EduFlow 网站加 Checkout |
 | **自动发 receipt 邮件** | Mark Paid 生成 receipt 但不自动发,要手动点 ✉ | 要不要 Mark Paid 后自动邮收据给客户? |
 | **EduFlow 客户健康 dashboard** | 没做 | 哪些客户即将到期 / 已流失 / MRR 趋势 |

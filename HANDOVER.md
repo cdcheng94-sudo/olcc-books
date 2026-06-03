@@ -2,7 +2,7 @@
 
 > 给接手开发/运维的人。当前状态、所有服务、所有 env var、架构决策、已完成、未完成。
 >
-> **最后更新:** 2026-06-03,v2 已上线 + 全双语 + Discount(% 制)+ Subscription 折扣每期自动套用。
+> **最后更新:** 2026-06-03,v2 已上线 + 全双语 + Discount(% 制)+ **资本/经营双资金池(股东借款/股本拆分)**。
 
 ---
 
@@ -82,18 +82,36 @@ CRON_SECRET=<32-byte hex>
 
 ## 5. Supabase 数据库 schema
 
-8 张表,migration 在 `supabase/migrations/` 已经跑过:
+9 张表,migration 在 `supabase/migrations/` 已经跑过(0001–0008):
 
 | 表 | 用途 | 关键 cascade |
 |---|---|---|
 | `settings` | key-value 公司资料/银行/编号计数器 | — |
 | `allowed_emails` | 白名单 | — |
-| `transactions` | 总账(income/expense) | 被 receipts/claims/recurring 级联写入 |
+| `shareholders` | 股东(资本池主体,0007 新增) | — |
+| `transactions` | 总账,**7 种 type**(见 §5.2) | 被 receipts/claims/recurring 级联写入 |
 | `invoices` | 开给客户的发票 | Mark Paid → 触发 createReceipt |
 | `receipts` | 收据(自动 + 手动) | insert → 自动写一行 income transactions |
 | `recurring` | 我们付的月费 | Mark Paid → 写一行 expense transactions |
 | `subscriptions` | 客户付我们的月费 (v2 新增) | Mark Paid → 经 Receipt 级联 → income transaction |
 | `claims` | 员工报销 | markPaid → 写一行 expense transactions |
+
+### 5.2 transactions 的 7 种 type + 资本池(0007/0008)
+
+`type` 从 income/expense 扩到 6 再到 7:
+`income / expense / shareholder_loan / capital_injection / capital_expense / loan_repayment / interest_paid`
+
+新增列:`shareholder_id`(FK,后 4 个 shareholder-linked 类型必填,CHECK 约束)、`loan_type`(已退役,留空)、`interest_rate`(预留);`category` 改可空。
+
+资金池(`lib/queries/capital.ts`):
+```
+Capital Pool   = Σshareholder_loan + Σcapital_injection − Σcapital_expense − Σloan_repayment
+Operating Pool = Σincome − Σexpense − Σinterest_paid
+Outstanding(每股东)= Σshareholder_loan − Σloan_repayment   (股本 capital_injection 不算欠款)
+```
+⚠️ **interest_paid 进 Operating Pool + P&L(可抵税),不减 Capital Pool。** P&L 的 Expense = expense + interest_paid。
+还款超额护栏在 `createTransaction`(应用层算 outstanding,不能超还)。
+`shareholder_loan`(债,要还、有利息)与 `capital_injection`(股本,不还、影响股权)是 0008 拆开的。
 
 ### 5.1 Cascade 设计核心
 
@@ -202,7 +220,9 @@ olcc-books/
 | Plan 卡翻译 | EduFlow 三个 plan 的 audience/features/label 双语 | `lib/i18n.ts` `EduFlowClient.tsx` |
 | Manifest + icon | PWA manifest + apple-icon,手机加桌面用公司 logo | `app/manifest.ts` `public/icon.png` |
 | **Discount(金额版)** | invoices/receipts 加固定金额折扣 | `0005_add_discount.sql` |
-| **Discount(% 版)** ← 最新 | 折扣改百分比;Subscriptions 持久折扣每期自动套用;Subscription Mark Paid 改走 Receipt 级联 | `0006_discount_percent.sql` + invoices/receipts/subscriptions/eduflow actions + 两个 PDF + 表单 |
+| **Discount(% 版)** | 折扣改百分比;Subscriptions 持久折扣每期自动套用;Subscription Mark Paid 改走 Receipt 级联 | `0006_discount_percent.sql` + invoices/receipts/subscriptions/eduflow actions + 两个 PDF + 表单 |
+| **资本/经营双资金池** | transactions type → 6 种 + shareholders 表 + /capital 页 + Dashboard 资金池卡 | `0007_capital_pools.sql` + `lib/queries/capital.ts` + `app/(app)/capital/*` + transactions 全套 |
+| **借款/股本拆分** ← 最新 | shareholder_loan(债)与 capital_injection(股本)拆成两个 type;Outstanding 只算借款 | `0008_shareholder_loan_split.sql` |
 
 每个 Phase / patch 的 commit message 在 `git log` 里完整写了背景。
 
