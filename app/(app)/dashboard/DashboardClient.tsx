@@ -1,6 +1,6 @@
 "use client";
 
-import { TrendingUp, TrendingDown, Wallet, AlertCircle, Clock, BarChart3, PieChart, History, ArrowRight } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, AlertCircle, Clock, BarChart3, PieChart, History, ArrowRight, Landmark, Briefcase, Coins } from "lucide-react";
 import Link from "next/link";
 import { useLang } from "@/components/LangProvider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import type { MonthlySummary } from "@/lib/queries/transactions";
 import type { RecurringWithUrgency } from "@/lib/queries/recurring";
 import type { SubscriptionWithUrgency } from "@/lib/queries/subscriptions";
 import type { MonthlyTrendPoint, CategorySlice } from "@/lib/queries/dashboard";
+import type { FundPools } from "@/lib/queries/capital";
 import type { TransactionRow } from "@/lib/types";
 
 type Props = {
@@ -22,9 +23,10 @@ type Props = {
   trend:      MonthlyTrendPoint[];
   byCategory: CategorySlice[];
   recent:     TransactionRow[];
+  pools:      FundPools;
 };
 
-export function DashboardClient({ summary, toPay, toCollect, trend, byCategory, recent }: Props) {
+export function DashboardClient({ summary, toPay, toCollect, trend, byCategory, recent, pools }: Props) {
   const { t } = useLang();
 
   const stat = (label: string, value: number, color: string, bg: string, Icon: React.ComponentType<{ size?: number }>) => (
@@ -39,6 +41,7 @@ export function DashboardClient({ summary, toPay, toCollect, trend, byCategory, 
       </CardHeader>
       <CardContent>
         <div className={"text-2xl font-bold " + color}>{fmtMoney(value)}</div>
+        <div className="text-[10px] text-muted-foreground mt-0.5">{t.capital.operatingOnly}</div>
       </CardContent>
     </Card>
   );
@@ -53,7 +56,38 @@ export function DashboardClient({ summary, toPay, toCollect, trend, byCategory, 
         <div className="text-sm text-muted-foreground">{t.common.greeting} 👋</div>
       </div>
 
-      {/* Stat cards */}
+      {/* Fund pools — Capital vs Operating */}
+      <Card className="mb-6">
+        <CardHeader className="flex-row items-center gap-2 space-y-0 pb-3">
+          <Coins size={18} className="text-gold" />
+          <CardTitle className="text-sm font-bold">{t.dashboard.totalAvailableFunds}</CardTitle>
+          <span className="ml-auto text-sm font-bold tabular-nums">
+            {t.dashboard.poolTotal}: <span className="text-navy">{fmtMoney(pools.total)}</span>
+          </span>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="rounded-lg border-2 border-primary/20 bg-primary/[0.04] p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Landmark size={16} className="text-navy" />
+                <span className="text-xs font-semibold text-navy">{t.dashboard.capitalPool}</span>
+              </div>
+              <div className="text-2xl font-bold text-navy tabular-nums">{fmtMoney(pools.capitalPool)}</div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">{t.capital.capitalPoolDesc}</div>
+            </div>
+            <div className="rounded-lg border-2 border-gold/30 bg-gold/[0.06] p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Briefcase size={16} className="text-gold" />
+                <span className="text-xs font-semibold" style={{ color: "hsl(var(--gold))" }}>{t.dashboard.operatingPool}</span>
+              </div>
+              <div className="text-2xl font-bold tabular-nums" style={{ color: "hsl(var(--gold))" }}>{fmtMoney(pools.operatingPool)}</div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">{t.capital.operatingPoolDesc}</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Stat cards (Operating / P&L only) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         {stat(t.dashboard.income,  summary.income,  "text-success", "bg-success-soft text-success", TrendingUp)}
         {stat(t.dashboard.expense, summary.expense, "text-danger",  "bg-danger-soft text-danger",   TrendingDown)}
@@ -68,6 +102,7 @@ export function DashboardClient({ summary, toPay, toCollect, trend, byCategory, 
         </CardHeader>
         <CardContent>
           <MonthlyBarChart data={trend} />
+          <div className="text-[11px] text-muted-foreground italic mt-1 text-center">{t.dashboard.cashflowCaption}</div>
         </CardContent>
       </Card>
 

@@ -1,33 +1,40 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Plus, Pencil, Trash2, ScanLine } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useLang } from "@/components/LangProvider";
 import { fmtDate, fmtMoney, isoMonth } from "@/lib/format";
-import { CATEGORIES } from "@/lib/categories";
-import type { TransactionRow } from "@/lib/types";
+import { TRANSACTION_TYPES, CAPITAL_CATEGORIES, type TransactionType } from "@/lib/categories";
+import type { TransactionRow, ShareholderRow } from "@/lib/types";
 import { deleteTransaction } from "./actions";
 import { TransactionFormModal, type TxPrefill } from "./TransactionFormModal";
 
-type Filters = {
-  yearMonth: string;        // "" means All time
-  type:      "" | "income" | "expense";
-  category:  string;
+type Props = {
+  initialRows: TransactionRow[];
+  shareholders: ShareholderRow[];
+  outstandingMap: Record<string, number>;
+  shareholderNames: Record<string, string>;
 };
 
-const NO_MONTH = "" as const;
+// 6-type badge colors (Tailwind default palette covers purple + rose).
+const TYPE_BADGE: Record<TransactionType, string> = {
+  income:            "bg-success-soft text-success",
+  expense:           "bg-danger-soft text-danger",
+  capital_injection: "bg-primary/10 text-navy",
+  capital_expense:   "bg-warning-soft text-warning",
+  loan_repayment:    "bg-purple-100 text-purple-700",
+  interest_paid:     "bg-rose-100 text-rose-700",
+};
 
-export function TransactionsClient({ initialRows }: { initialRows: TransactionRow[] }) {
+export function TransactionsClient({ initialRows, shareholders: initialShareholders, outstandingMap, shareholderNames }: Props) {
   const { t } = useLang();
   const [rows, setRows] = useState<TransactionRow[]>(initialRows);
-  const [filters, setFilters] = useState<Filters>({
-    yearMonth: isoMonth(),
-    type: "",
-    category: "",
-  });
+  const [shareholders, setShareholders] = useState<ShareholderRow[]>(initialShareholders);
+  const [yearMonth, setYearMonth] = useState<string>(isoMonth());
+  const [typeSet, setTypeSet] = useState<Set<TransactionType>>(new Set(TRANSACTION_TYPES));
   const [editing, setEditing] = useState<TransactionRow | null>(null);
   const [prefill, setPrefill] = useState<TxPrefill | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -35,45 +42,70 @@ export function TransactionsClient({ initialRows }: { initialRows: TransactionRo
   const [scanning, setScanning] = useState(false);
   const scanInputRef = useRef<HTMLInputElement>(null);
 
-  // Re-fetch rows whenever filters change. Client-side query against Supabase
-  // (RLS allows authenticated users to read).
+  // Re-fetch by month (type filter is applied in-memory below).
   useEffect(() => {
     const supabase = createClient();
     let q = supabase.from("transactions").select("*").order("date", { ascending: false });
-
-    if (filters.yearMonth) {
-      const [y, m] = filters.yearMonth.split("-").map(Number);
-      const start = `${filters.yearMonth}-01`;
+    if (yearMonth) {
+      const [y, m] = yearMonth.split("-").map(Number);
+      const start = `${yearMonth}-01`;
       const next = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
       q = q.gte("date", start).lt("date", next);
     }
-    if (filters.type)     q = q.eq("type", filters.type);
-    if (filters.category) q = q.eq("category", filters.category);
+    q.then(({ data, error }) => { if (!error && data) setRows(data as TransactionRow[]); });
+  }, [yearMonth]);
 
-    q.then(({ data, error }) => {
-      if (!error && data) setRows(data as TransactionRow[]);
+  const visibleRows = useMemo(() => rows.filter((r) => typeSet.has(r.type)), [rows, typeSet]);
+
+  // Deep-link from /capital "+ Add": /transactions?new=<type> opens the form
+  // pre-set to that type. Read once on mount (client only).
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get("new");
+    if (p && (TRANSACTION_TYPES as readonly string[]).includes(p)) {
+      setEditing(null);
+      setPrefill({ type: p as TransactionType });
+      setModalOpen(true);
+      // clean the URL so a refresh doesn't re-open
+      window.history.replaceState({}, "", "/transactions");
+    }
+  }, []);
+
+  function toggleType(ty: TransactionType) {
+    setTypeSet((prev) => {
+      const next = new Set(prev);
+      if (next.has(ty)) next.delete(ty); else next.add(ty);
+      // never allow empty → reset to all
+      if (next.size === 0) return new Set(TRANSACTION_TYPES);
+      return next;
     });
-  }, [filters]);
-
-  function openNew() {
-    setEditing(null);
-    setPrefill(null);
-    setModalOpen(true);
   }
 
-  function openEdit(row: TransactionRow) {
-    setEditing(row);
-    setPrefill(null);
-    setModalOpen(true);
+  function openNew()  { setEditing(null); setPrefill(null); setModalOpen(true); }
+  function openEdit(row: TransactionRow) { setEditing(row); setPrefill(null); setModalOpen(true); }
+
+  function onSaved(saved: TransactionRow) {
+    setRows((prev) => {
+      const idx = prev.findIndex((r) => r.id === saved.id);
+      if (idx >= 0) { const c = [...prev]; c[idx] = saved; return c; }
+      return [saved, ...prev];
+    });
+    setModalOpen(false);
   }
 
-  function pickScanFile() {
-    scanInputRef.current?.click();
+  function onDelete(row: TransactionRow) {
+    if (!confirm(t.tx.confirmDeleteTx)) return;
+    startTransition(async () => {
+      try {
+        await deleteTransaction(row.id);
+        setRows((prev) => prev.filter((r) => r.id !== row.id));
+      } catch (e) { alert(t.errors.deleteFailed + (e as Error).message); }
+    });
   }
 
+  function pickScanFile() { scanInputRef.current?.click(); }
   async function onScanFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
-    e.target.value = "";   // reset so picking the same file again re-fires
+    e.target.value = "";
     if (!f) return;
     setScanning(true);
     try {
@@ -92,60 +124,31 @@ export function TransactionsClient({ initialRows }: { initialRows: TransactionRo
     }
   }
 
-  function onSaved(saved: TransactionRow) {
-    setRows((prev) => {
-      const idx = prev.findIndex((r) => r.id === saved.id);
-      if (idx >= 0) {
-        const copy = [...prev];
-        copy[idx] = saved;
-        return copy;
-      }
-      // New row — prepend (latest first)
-      return [saved, ...prev];
-    });
-    setModalOpen(false);
+  function categoryLabel(r: TransactionRow): string {
+    if (!r.category) return "—";
+    if (r.type === "capital_expense" && (CAPITAL_CATEGORIES as readonly string[]).includes(r.category)) {
+      return t.capitalCat[r.category as keyof typeof t.capitalCat];
+    }
+    return r.category;
   }
-
-  function onDelete(row: TransactionRow) {
-    if (!confirm(t.tx.confirmDeleteTx)) return;
-    startTransition(async () => {
-      try {
-        await deleteTransaction(row.id);
-        setRows((prev) => prev.filter((r) => r.id !== row.id));
-      } catch (e) {
-        alert(t.errors.deleteFailed + (e as Error).message);
-      }
-    });
+  function partyLabel(r: TransactionRow): string {
+    if (r.shareholder_id && shareholderNames[r.shareholder_id]) return shareholderNames[r.shareholder_id];
+    return r.party || "—";
   }
-
-  const categoryChoices =
-    filters.type === "income"  ? CATEGORIES.income :
-    filters.type === "expense" ? CATEGORIES.expense :
-    [...CATEGORIES.income, ...CATEGORIES.expense];
+  const signFor = (ty: TransactionType) =>
+    ty === "income" || ty === "capital_injection" ? "+" : "−";
+  const colorFor = (ty: TransactionType) =>
+    ty === "income" || ty === "capital_injection" ? "text-success" : "text-danger";
 
   return (
     <div>
-      {/* header row */}
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div className="text-sm text-muted-foreground">
-          {rows.length} {rows.length === 1 ? t.common.entry : t.common.entries}
+          {visibleRows.length} {visibleRows.length === 1 ? t.common.entry : t.common.entries}
         </div>
         <div className="flex items-center gap-2">
-          <input
-            ref={scanInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={onScanFile}
-            className="hidden"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            onClick={pickScanFile}
-            disabled={scanning}
-            className="border-gold text-navy hover:bg-gold/10"
-          >
+          <input ref={scanInputRef} type="file" accept="image/*" capture="environment" onChange={onScanFile} className="hidden" />
+          <Button type="button" variant="outline" onClick={pickScanFile} disabled={scanning} className="border-gold text-navy hover:bg-gold/10">
             <ScanLine className="w-4 h-4 mr-1" />
             {scanning ? t.tx.scanning : t.tx.scanReceipt}
           </Button>
@@ -158,50 +161,29 @@ export function TransactionsClient({ initialRows }: { initialRows: TransactionRo
 
       {/* filters */}
       <Card className="p-4 mb-5">
-        <div className="flex flex-wrap gap-3 items-end">
+        <div className="flex flex-wrap gap-3 items-center">
           <label className="flex flex-col gap-1 text-xs text-muted-foreground">
             <span>{t.tx.filterMonth}</span>
-            <input
-              type="month"
-              value={filters.yearMonth}
-              onChange={(e) => setFilters((f) => ({ ...f, yearMonth: e.target.value }))}
-              className="border border-border rounded-md px-3 py-1.5 text-sm bg-background"
-            />
+            <input type="month" value={yearMonth} onChange={(e) => setYearMonth(e.target.value)} className="border border-border rounded-md px-3 py-1.5 text-sm bg-background" />
           </label>
-          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-            <span>{t.tx.filterType}</span>
-            <select
-              value={filters.type}
-              onChange={(e) => setFilters((f) => ({ ...f, type: e.target.value as Filters["type"], category: "" }))}
-              className="border border-border rounded-md px-3 py-1.5 text-sm bg-background min-w-[120px]"
-            >
-              <option value="">{t.tx.filterAllType}</option>
-              <option value="income">{t.tx.income}</option>
-              <option value="expense">{t.tx.expense}</option>
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-            <span>{t.tx.filterCategory}</span>
-            <select
-              value={filters.category}
-              onChange={(e) => setFilters((f) => ({ ...f, category: e.target.value }))}
-              className="border border-border rounded-md px-3 py-1.5 text-sm bg-background min-w-[160px]"
-            >
-              <option value="">{t.tx.filterAllCat}</option>
-              {categoryChoices.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </label>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setFilters({ yearMonth: NO_MONTH, type: "", category: "" })}
-            className="text-muted-foreground"
-          >
+          <Button type="button" variant="ghost" size="sm" onClick={() => setYearMonth("")} className="text-muted-foreground self-end">
             {t.tx.showOlder}
           </Button>
+          <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+            <span>{t.tx.filterTypeLabel}</span>
+            <div className="flex flex-wrap gap-1">
+              {TRANSACTION_TYPES.map((ty) => {
+                const on = typeSet.has(ty);
+                return (
+                  <button key={ty} type="button" onClick={() => toggleType(ty)}
+                    className={"px-2 py-1 rounded-md text-[11px] font-medium border transition-colors " +
+                      (on ? TYPE_BADGE[ty] + " border-transparent" : "bg-card text-muted-foreground border-border")}>
+                    {t.txType[ty]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </Card>
 
@@ -211,46 +193,36 @@ export function TransactionsClient({ initialRows }: { initialRows: TransactionRo
           <thead className="bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="text-left px-4 py-3 font-medium w-[110px]">{t.tx.date}</th>
-              <th className="text-left px-4 py-3 font-medium w-[90px]">{t.tx.type}</th>
+              <th className="text-left px-4 py-3 font-medium w-[140px]">{t.tx.type}</th>
               <th className="text-left px-4 py-3 font-medium">{t.tx.category}</th>
               <th className="text-right px-4 py-3 font-medium w-[140px]">{t.tx.amount}</th>
-              <th className="text-left px-4 py-3 font-medium">{t.tx.party}</th>
+              <th className="text-left px-4 py-3 font-medium">{t.tx.party} / {t.capital.shareholder}</th>
               <th className="text-left px-4 py-3 font-medium">{t.tx.note}</th>
-              <th className="text-left px-4 py-3 font-medium w-[80px]">{t.tx.receipt}</th>
-              <th className="w-[100px]"></th>
+              <th className="text-left px-4 py-3 font-medium w-[70px]">{t.tx.receipt}</th>
+              <th className="w-[90px]"></th>
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="text-center text-muted-foreground italic py-12">
-                  {t.common.empty}
-                </td>
-              </tr>
-            ) : rows.map((r) => (
+            {visibleRows.length === 0 ? (
+              <tr><td colSpan={8} className="text-center text-muted-foreground italic py-12">{t.common.empty}</td></tr>
+            ) : visibleRows.map((r) => (
               <tr key={r.id} className="border-t border-border hover:bg-muted/20">
                 <td className="px-4 py-3 whitespace-nowrap">{fmtDate(r.date)}</td>
                 <td className="px-4 py-3">
-                  <span className={
-                    "inline-block px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wide " +
-                    (r.type === "income" ? "bg-success-soft text-success" : "bg-danger-soft text-danger")
-                  }>
-                    {r.type === "income" ? t.tx.income : t.tx.expense}
+                  <span className={"inline-block px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wide " + TYPE_BADGE[r.type]}>
+                    {t.txType[r.type]}
                   </span>
                 </td>
-                <td className="px-4 py-3">{r.category}</td>
-                <td className={
-                  "px-4 py-3 text-right whitespace-nowrap font-semibold tabular-nums " +
-                  (r.type === "income" ? "text-success" : "text-danger")
-                }>
-                  {r.type === "income" ? "+ " : "− "}{fmtMoney(r.amount)}
+                <td className="px-4 py-3">{categoryLabel(r)}</td>
+                <td className={"px-4 py-3 text-right whitespace-nowrap font-semibold tabular-nums " + colorFor(r.type)}>
+                  {signFor(r.type)} {fmtMoney(r.amount)}
                 </td>
-                <td className="px-4 py-3">{r.party || <span className="text-muted-foreground">—</span>}</td>
-                <td className="px-4 py-3 text-muted-foreground">{r.note || <span className="text-muted-foreground">—</span>}</td>
+                <td className="px-4 py-3">{partyLabel(r)}</td>
+                <td className="px-4 py-3 text-muted-foreground">{r.note || "—"}</td>
                 <td className="px-4 py-3">
-                  {r.receipt_url ? (
-                    <a href={r.receipt_url} target="_blank" rel="noreferrer" className="text-navy hover:text-gold underline">View</a>
-                  ) : <span className="text-muted-foreground">—</span>}
+                  {r.receipt_url
+                    ? <a href={r.receipt_url} target="_blank" rel="noreferrer" className="text-navy hover:text-gold underline">{t.actions.view}</a>
+                    : <span className="text-muted-foreground">—</span>}
                 </td>
                 <td className="px-2 py-3 text-right">
                   <button onClick={() => openEdit(r)} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-navy" title={t.common.edit}>
@@ -271,6 +243,9 @@ export function TransactionsClient({ initialRows }: { initialRows: TransactionRo
         onOpenChange={setModalOpen}
         editing={editing}
         prefill={prefill}
+        shareholders={shareholders}
+        outstandingMap={outstandingMap}
+        onShareholderAdded={(s) => setShareholders((prev) => [...prev, s])}
         onSaved={onSaved}
       />
     </div>

@@ -72,11 +72,14 @@ export async function getMonthlySummary(
     .lt("date", nextMonth);
   if (error) throw new Error(error.message);
 
+  // P&L (Operating only): expense includes interest_paid; capital_* and
+  // loan_repayment do NOT touch the P&L.
   let income = 0, expense = 0;
   for (const row of data || []) {
     const amt = Number(row.amount) || 0;
-    if (row.type === "income")  income  += amt;
-    if (row.type === "expense") expense += amt;
+    if (row.type === "income")        income  += amt;
+    if (row.type === "expense")       expense += amt;
+    if (row.type === "interest_paid") expense += amt;
   }
   return {
     income:  +income.toFixed(2),

@@ -11,17 +11,37 @@ export type ISODate = string;       // e.g. "2026-05-28"
 export type ISODateTime = string;   // e.g. "2026-05-28T10:30:00.000Z"
 export type UUID = string;
 
+// ---------- shareholders (Capital / Operating dual-pool) ----------
+export type ShareholderRow = {
+  id: UUID;
+  name: string;
+  created_at: ISODateTime;
+};
+
 // ---------- transactions ----------
+export type TransactionType =
+  | "income"
+  | "expense"
+  | "capital_injection"
+  | "capital_expense"
+  | "loan_repayment"
+  | "interest_paid";
+
+export type LoanType = "director_loan" | "paid_up_capital" | "other";
+
 export type TransactionRow = {
   id: UUID;
   date: ISODate;
-  type: "income" | "expense";
-  category: string;
+  type: TransactionType;
+  category: string | null;        // nullable: capital/loan/interest types have none
   amount: number;
   party: string | null;
   note: string | null;
   receipt_url: string | null;
   linked_doc_id: UUID | null;
+  shareholder_id: UUID | null;    // set for capital_injection / loan_repayment / interest_paid
+  loan_type: LoanType | null;     // set for capital_injection
+  interest_rate: number;          // reserved, default 0
   created_at: ISODateTime;
 };
 

@@ -57,8 +57,11 @@ export async function getMonthlyTrend(
     const i = idx.get(ym);
     if (i === undefined) continue;
     const amt = Number(row.amount) || 0;
-    if (row.type === "income")  buckets[i].income  += amt;
-    if (row.type === "expense") buckets[i].expense += amt;
+    // Operating cashflow only: income vs (expense + interest_paid).
+    // capital_injection / capital_expense / loan_repayment are excluded.
+    if (row.type === "income")        buckets[i].income  += amt;
+    if (row.type === "expense")       buckets[i].expense += amt;
+    if (row.type === "interest_paid") buckets[i].expense += amt;
   }
   // Round once at the end so chart tooltips aren't 1234.0000000001
   for (const b of buckets) {

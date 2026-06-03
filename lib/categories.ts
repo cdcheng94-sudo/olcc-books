@@ -11,7 +11,6 @@ export const CATEGORIES = {
   income: [
     "Sales Income",
     "Service Income",
-    "Capital Injection",
     "Other Income",
   ],
   expense: [
@@ -29,11 +28,62 @@ export const CATEGORIES = {
 export type IncomeCategory = (typeof CATEGORIES.income)[number];
 export type ExpenseCategory = (typeof CATEGORIES.expense)[number];
 export type Category = IncomeCategory | ExpenseCategory;
-export type TransactionType = "income" | "expense";
+
+// ---------- transaction types (Capital / Operating dual-pool) ----------
+//
+// 6 types split across two fund pools:
+//   Operating Pool  ← income, expense, interest_paid   (also drive P&L)
+//   Capital Pool    ← capital_injection, capital_expense, loan_repayment
+//
+// ⚠️ interest_paid pays a shareholder but is an OPERATING cost (tax-deductible)
+//    so it hits the Operating Pool + P&L, NOT the Capital Pool.
+
+export const TRANSACTION_TYPES = [
+  "income",
+  "expense",
+  "capital_injection",
+  "capital_expense",
+  "loan_repayment",
+  "interest_paid",
+] as const;
+export type TransactionType = (typeof TRANSACTION_TYPES)[number];
+
+/** Types whose movements live in / affect the Operating Pool + P&L. */
+export const OPERATING_TYPES = ["income", "expense", "interest_paid"] as const;
+/** Types whose movements live in / affect the Capital Pool (off P&L). */
+export const CAPITAL_TYPES = ["capital_injection", "capital_expense", "loan_repayment"] as const;
+/** Types that MUST carry a shareholder_id (DB + app both enforce). */
+export const SHAREHOLDER_TYPES = ["capital_injection", "loan_repayment", "interest_paid"] as const;
+
+export function isOperatingType(t: TransactionType): boolean {
+  return (OPERATING_TYPES as readonly string[]).includes(t);
+}
+export function requiresShareholder(t: TransactionType): boolean {
+  return (SHAREHOLDER_TYPES as readonly string[]).includes(t);
+}
 
 export function categoriesFor(type: TransactionType): readonly string[] {
-  return type === "income" ? CATEGORIES.income : CATEGORIES.expense;
+  if (type === "income")  return CATEGORIES.income;
+  if (type === "expense") return CATEGORIES.expense;
+  return [];
 }
+
+// ---------- loan types (capital_injection only) ----------
+export const LOAN_TYPES = ["director_loan", "paid_up_capital", "other"] as const;
+export type LoanType = (typeof LOAN_TYPES)[number];
+
+// ---------- capital expense categories (capital_expense only) ----------
+// Stored as a stable key in transactions.category; displayed via i18n
+// (t.capitalCat[key]). Distinct from the income/expense categories above.
+export const CAPITAL_CATEGORIES = [
+  "renovation",
+  "equipment",
+  "registration",
+  "logo_design",
+  "software_license",
+  "other",
+] as const;
+export type CapitalCategory = (typeof CAPITAL_CATEGORIES)[number];
 
 /**
  * Claim-specific categories (per spec §3.5 — intentionally distinct from

@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Repeat2,
   GraduationCap,
+  Landmark,
   Wallet,
   Settings as SettingsIcon,
 } from "lucide-react";
@@ -27,6 +28,7 @@ const NAV: { href: string; key: keyof Dict["nav"]; Icon: React.ComponentType<{ s
   { href: "/recurring",     key: "recurring",     Icon: RefreshCw },
   { href: "/subscriptions", key: "subscriptions", Icon: Repeat2 },
   { href: "/eduflow",       key: "eduflow",       Icon: GraduationCap, gold: true },
+  { href: "/capital",       key: "capital",       Icon: Landmark },
   { href: "/claims",        key: "claims",        Icon: Wallet },
   { href: "/settings",      key: "settings",      Icon: SettingsIcon },
 ];
