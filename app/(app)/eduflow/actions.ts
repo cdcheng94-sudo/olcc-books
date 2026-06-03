@@ -31,8 +31,9 @@ export type EduFlowOnboardInput = {
   monthly_override?:    number;
   setup_override?:      number;
   first_month_free:     boolean;
-  discount_percent?:    number;       // 0–100; applies to BOTH the setup invoice
-                                      // AND the ongoing monthly subscription
+  monthly_discount_percent?: number;  // 0–100; folds into the monthly subscription
+                                      // (recurring) AND the first-month line
+  setup_discount_percent?:   number;  // 0–100; one-time, only on the setup fee line
 };
 
 /** Add one month to an ISO date, clamping day-of-month (Jan 31 → Feb 28). */
@@ -60,29 +61,40 @@ export async function onboardEduFlowCustomer(input: EduFlowOnboardInput): Promis
   if (!isFinite(monthly) || monthly <= 0) throw new Error("Monthly amount must be > 0.");
   if (!isFinite(setup)   || setup   <  0) throw new Error("Setup fee must be ≥ 0.");
 
-  const discountPercent = (() => {
-    const d = Number(input.discount_percent);
+  const clampPct = (v: number | undefined, label: string) => {
+    const d = Number(v);
     if (!isFinite(d) || d <= 0) return 0;
-    if (d > 100) throw new Error("Discount must be between 0 and 100%.");
+    if (d > 100) throw new Error(`${label} discount must be between 0 and 100%.`);
     return +d.toFixed(2);
-  })();
+  };
+  const monthlyDiscPct = clampPct(input.monthly_discount_percent, "Monthly");
+  const setupDiscPct   = clampPct(input.setup_discount_percent, "Setup");
 
   // ---- Build invoice line items ----
+  // Discounts are baked into each line's price (kept positive so they pass
+  // line validation) with the rate noted in the description, so the customer
+  // sees the original + the discount on the PDF.
   const items: LineItem[] = [];
   if (setup > 0) {
+    const netSetup = +(setup * (1 - setupDiscPct / 100)).toFixed(2);
     items.push({
-      desc:       `EduFlow ${plan.label} — Setup fee (one-time)`,
+      desc:       setupDiscPct > 0
+        ? `EduFlow ${plan.label} — Setup fee (−${setupDiscPct}%, was MYR ${setup.toFixed(2)})`
+        : `EduFlow ${plan.label} — Setup fee (one-time)`,
       qty:        1,
-      unit_price: setup,
-      amount:     setup,
+      unit_price: netSetup,
+      amount:     netSetup,
     });
   }
   if (!input.first_month_free) {
+    const netMonthly = +(monthly * (1 - monthlyDiscPct / 100)).toFixed(2);
     items.push({
-      desc:       `EduFlow ${plan.label} — First month subscription`,
+      desc:       monthlyDiscPct > 0
+        ? `EduFlow ${plan.label} — First month (−${monthlyDiscPct}%, was MYR ${monthly.toFixed(2)})`
+        : `EduFlow ${plan.label} — First month subscription`,
       qty:        1,
-      unit_price: monthly,
-      amount:     monthly,
+      unit_price: netMonthly,
+      amount:     netMonthly,
     });
   }
   if (items.length === 0) {
@@ -105,9 +117,9 @@ export async function onboardEduFlowCustomer(input: EduFlowOnboardInput): Promis
     customer_email:   input.customer_email,
     customer_address: input.customer_address,
     items,
-    discount_percent: discountPercent,
+    discount_percent: 0,   // discounts are baked into the line items above
     tax:              0,
-    note:             `EduFlow ${plan.label} plan — recurring subscription tracked separately.${input.first_month_free ? " First month is complimentary." : ""}${discountPercent > 0 ? ` ${discountPercent}% discount applies to every monthly bill.` : ""}`,
+    note:             `EduFlow ${plan.label} plan — recurring subscription tracked separately.${input.first_month_free ? " First month is complimentary." : ""}${monthlyDiscPct > 0 ? ` ${monthlyDiscPct}% discount applies to every monthly bill.` : ""}`,
   });
 
   // ---- 2. Create Subscription (next charge = start + 1 month) ----
@@ -120,7 +132,7 @@ export async function onboardEduFlowCustomer(input: EduFlowOnboardInput): Promis
       customer_phone:      input.customer_phone,
       service_desc:        `EduFlow ${plan.label} — monthly subscription`,
       amount:              monthly,
-      discount_percent:    discountPercent,
+      discount_percent:    monthlyDiscPct,
       frequency:           "monthly",
       next_charge_date:    nextCharge,
       remind_days_before:  7,

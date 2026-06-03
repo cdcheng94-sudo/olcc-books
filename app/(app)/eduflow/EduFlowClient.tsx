@@ -30,25 +30,31 @@ export function EduFlowClient() {
   const [startDate,       setStartDate]       = useState(todayIso());
   const [monthlyOverride, setMonthlyOverride] = useState("");
   const [setupOverride,   setSetupOverride]   = useState("");
-  const [discount,        setDiscount]        = useState("");
+  const [monthlyDiscount, setMonthlyDiscount] = useState("");
+  const [setupDiscount,   setSetupDiscount]   = useState("");
   const [firstFree,       setFirstFree]       = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const plan = EDUFLOW_PLANS[planKey];
+  const clamp = (v: string) => Math.min(100, Math.max(0, Number(v) || 0));
   const monthlyEff = useMemo(() => Number(monthlyOverride || plan.monthly), [monthlyOverride, plan.monthly]);
   const setupEff   = useMemo(() => Number(setupOverride   || plan.setup),   [setupOverride,   plan.setup]);
-  const discountPct = useMemo(() => Math.min(100, Math.max(0, Number(discount) || 0)), [discount]);
+  const monthlyDiscPct = useMemo(() => clamp(monthlyDiscount), [monthlyDiscount]);
+  const setupDiscPct   = useMemo(() => clamp(setupDiscount),   [setupDiscount]);
   const firstFreeEff = firstFree ?? plan.firstMonthFree;
-  const grossInvoice = setupEff + (firstFreeEff ? 0 : monthlyEff);
-  const discountAmt  = grossInvoice * (discountPct / 100);
-  const firstInvoiceTotal = grossInvoice - discountAmt;
+
+  const netSetup   = +(setupEff   * (1 - setupDiscPct   / 100)).toFixed(2);
+  const netMonthly = +(monthlyEff * (1 - monthlyDiscPct / 100)).toFixed(2);
+  const firstMonthLine = firstFreeEff ? 0 : netMonthly;
+  const firstInvoiceTotal = +(netSetup + firstMonthLine).toFixed(2);
 
   function pickPlan(k: EduFlowPlanKey) {
     setPlanKey(k);
     setMonthlyOverride("");
     setSetupOverride("");
-    setDiscount("");
+    setMonthlyDiscount("");
+    setSetupDiscount("");
     setFirstFree(null);
   }
 
@@ -67,12 +73,13 @@ export function EduFlowClient() {
           monthly_override: monthlyOverride ? Number(monthlyOverride) : undefined,
           setup_override:   setupOverride   ? Number(setupOverride)   : undefined,
           first_month_free: firstFreeEff,
-          discount_percent: discountPct > 0 ? discountPct : undefined,
+          monthly_discount_percent: monthlyDiscPct > 0 ? monthlyDiscPct : undefined,
+          setup_discount_percent:   setupDiscPct   > 0 ? setupDiscPct   : undefined,
         });
         alert(interp(t.eduflow.successTemplate, {
           name:         customerName,
           invoiceTotal: fmtMoney(firstInvoiceTotal),
-          monthly:      fmtMoney(monthlyEff),
+          monthly:      fmtMoney(netMonthly),
         }));
         router.push("/invoices");
         router.refresh();
@@ -189,43 +196,46 @@ export function EduFlowClient() {
               </label>
             </div>
 
+            {/* Monthly: override + recurring discount */}
             <div className="flex flex-col gap-1">
               <Label className="text-xs">
                 {t.eduflow.formMonthlyOverride} <span className="text-muted-foreground">{t.eduflow.formOverrideHint}</span>
               </Label>
               <Input
-                type="number"
-                step="0.01"
-                min="0"
+                type="number" step="0.01" min="0"
                 value={monthlyOverride}
                 onChange={(e) => setMonthlyOverride(e.target.value)}
                 placeholder={`${t.eduflow.formDefaultPrefix}${plan.monthly}`}
               />
             </div>
             <div className="flex flex-col gap-1">
+              <Label className="text-xs">{t.eduflow.formMonthlyDiscount}</Label>
+              <Input
+                type="number" step="0.5" min="0" max="100"
+                value={monthlyDiscount}
+                onChange={(e) => setMonthlyDiscount(e.target.value)}
+                placeholder="0"
+              />
+            </div>
+
+            {/* Setup: override + one-time discount */}
+            <div className="flex flex-col gap-1">
               <Label className="text-xs">
                 {t.eduflow.formSetupOverride} <span className="text-muted-foreground">{t.eduflow.formOverrideHint}</span>
               </Label>
               <Input
-                type="number"
-                step="0.01"
-                min="0"
+                type="number" step="0.01" min="0"
                 value={setupOverride}
                 onChange={(e) => setSetupOverride(e.target.value)}
                 placeholder={`${t.eduflow.formDefaultPrefix}${plan.setup}`}
               />
             </div>
-            <div className="md:col-span-2 flex flex-col gap-1">
-              <Label className="text-xs">
-                {t.eduflow.formDiscount} <span className="text-muted-foreground">{t.eduflow.formDiscountHint}</span>
-              </Label>
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs">{t.eduflow.formSetupDiscount}</Label>
               <Input
-                type="number"
-                step="0.5"
-                min="0"
-                max="100"
-                value={discount}
-                onChange={(e) => setDiscount(e.target.value)}
+                type="number" step="0.5" min="0" max="100"
+                value={setupDiscount}
+                onChange={(e) => setSetupDiscount(e.target.value)}
                 placeholder="0"
               />
             </div>
@@ -233,13 +243,25 @@ export function EduFlowClient() {
             <div className="md:col-span-2 bg-muted/30 rounded-md p-4 text-sm">
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold mb-2">{t.eduflow.summaryWillInclude}</div>
               <div className="flex justify-between text-xs">
-                <span>{interp(t.eduflow.summarySetup, { plan: t.eduflow.plans[planKey].label })}</span>
-                <span className="tabular-nums">{fmtMoney(setupEff)}</span>
+                <span>
+                  {interp(t.eduflow.summarySetup, { plan: t.eduflow.plans[planKey].label })}
+                  {setupDiscPct > 0 && <span className="text-destructive"> (−{setupDiscPct}%)</span>}
+                </span>
+                <span className="tabular-nums">
+                  {setupDiscPct > 0 && <span className="line-through text-muted-foreground mr-1.5">{fmtMoney(setupEff)}</span>}
+                  {fmtMoney(netSetup)}
+                </span>
               </div>
               {!firstFreeEff && (
                 <div className="flex justify-between text-xs">
-                  <span>{interp(t.eduflow.summaryFirstMonth, { plan: t.eduflow.plans[planKey].label })}</span>
-                  <span className="tabular-nums">{fmtMoney(monthlyEff)}</span>
+                  <span>
+                    {interp(t.eduflow.summaryFirstMonth, { plan: t.eduflow.plans[planKey].label })}
+                    {monthlyDiscPct > 0 && <span className="text-destructive"> (−{monthlyDiscPct}%)</span>}
+                  </span>
+                  <span className="tabular-nums">
+                    {monthlyDiscPct > 0 && <span className="line-through text-muted-foreground mr-1.5">{fmtMoney(monthlyEff)}</span>}
+                    {fmtMoney(netMonthly)}
+                  </span>
                 </div>
               )}
               {firstFreeEff && (
@@ -248,18 +270,16 @@ export function EduFlowClient() {
                   <span className="font-bold">{t.eduflow.summaryFree}</span>
                 </div>
               )}
-              {discountPct > 0 && (
-                <div className="flex justify-between text-xs text-destructive">
-                  <span>{t.eduflow.summaryDiscount} ({discountPct}%)</span>
-                  <span className="tabular-nums font-bold">−{fmtMoney(discountAmt)}</span>
-                </div>
-              )}
               <div className="flex justify-between border-t border-border mt-2 pt-2 text-sm font-bold">
                 <span>{t.eduflow.summaryTotal}</span>
                 <span className="tabular-nums text-navy">{fmtMoney(firstInvoiceTotal)}</span>
               </div>
               <div className="text-[11px] text-muted-foreground mt-2">
-                {t.eduflow.summaryPlusMonthly}<span className="font-bold text-navy">{fmtMoney(monthlyEff)}</span>{t.eduflow.summaryMonthlyOf}<span className="font-bold text-navy">{t.eduflow.summaryStartingOne}</span>{t.eduflow.summaryEnding}
+                {t.eduflow.summaryPlusMonthly}
+                {monthlyDiscPct > 0 && <span className="line-through mr-1">{fmtMoney(monthlyEff)}</span>}
+                <span className="font-bold text-navy">{fmtMoney(netMonthly)}</span>
+                {monthlyDiscPct > 0 && <span className="text-destructive"> (−{monthlyDiscPct}%)</span>}
+                {t.eduflow.summaryMonthlyOf}<span className="font-bold text-navy">{t.eduflow.summaryStartingOne}</span>{t.eduflow.summaryEnding}
               </div>
             </div>
 
