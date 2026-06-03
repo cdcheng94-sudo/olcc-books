@@ -52,8 +52,10 @@ export type InvoiceStatus = "draft" | "sent" | "paid";
 export type LineItem = {
   desc: string;
   qty: number;
-  unit_price: number;
-  amount: number;
+  unit_price: number;        // net (post-discount) unit price
+  amount: number;            // net line amount
+  original_unit_price?: number;  // pre-discount, shown struck-through when set
+  discount_percent?: number;     // shown in red when set
 };
 
 export type InvoiceRow = {

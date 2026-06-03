@@ -78,23 +78,21 @@ export async function onboardEduFlowCustomer(input: EduFlowOnboardInput): Promis
   if (setup > 0) {
     const netSetup = +(setup * (1 - setupDiscPct / 100)).toFixed(2);
     items.push({
-      desc:       setupDiscPct > 0
-        ? `EduFlow ${plan.label} — Setup fee (−${setupDiscPct}%, was MYR ${setup.toFixed(2)})`
-        : `EduFlow ${plan.label} — Setup fee (one-time)`,
+      desc:       `EduFlow ${plan.label} — Setup fee (one-time)`,
       qty:        1,
       unit_price: netSetup,
       amount:     netSetup,
+      ...(setupDiscPct > 0 ? { original_unit_price: setup, discount_percent: setupDiscPct } : {}),
     });
   }
   if (!input.first_month_free) {
     const netMonthly = +(monthly * (1 - monthlyDiscPct / 100)).toFixed(2);
     items.push({
-      desc:       monthlyDiscPct > 0
-        ? `EduFlow ${plan.label} — First month (−${monthlyDiscPct}%, was MYR ${monthly.toFixed(2)})`
-        : `EduFlow ${plan.label} — First month subscription`,
+      desc:       `EduFlow ${plan.label} — First month subscription`,
       qty:        1,
       unit_price: netMonthly,
       amount:     netMonthly,
+      ...(monthlyDiscPct > 0 ? { original_unit_price: monthly, discount_percent: monthlyDiscPct } : {}),
     });
   }
   if (items.length === 0) {

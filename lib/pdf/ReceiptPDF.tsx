@@ -125,7 +125,17 @@ export function ReceiptPDF({ receipt, settings }: { receipt: ReceiptRow; setting
           {items.map((it, i) => (
             <View key={i} style={styles.trBody}>
               <Text style={styles.tdIdx}>{i + 1}</Text>
-              <Text style={styles.tdDesc}>{it.desc}</Text>
+              <View style={styles.tdDesc}>
+                <Text>{it.desc}</Text>
+                {it.discount_percent ? (
+                  <Text style={{ fontSize: 7, color: DANGER, marginTop: 1, fontWeight: 700 }}>
+                    {it.discount_percent}% OFF{"  "}
+                    <Text style={{ textDecoration: "line-through", color: MUTED, fontWeight: 400 }}>
+                      was {money(it.original_unit_price ?? 0, currency)}
+                    </Text>
+                  </Text>
+                ) : null}
+              </View>
               <Text style={styles.tdQty}>{it.qty}</Text>
               <Text style={styles.tdUnit}>{money(it.unit_price, currency)}</Text>
               <Text style={styles.tdAmt}>{money(it.amount, currency)}</Text>
