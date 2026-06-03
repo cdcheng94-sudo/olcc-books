@@ -12,9 +12,10 @@ import { CapitalClient } from "./CapitalClient";
  */
 export default async function CapitalPage() {
   const supabase = await createClient();
-  const [totals, byShareholder, loansIn, repayments, capitalExpenses, interestPaid] = await Promise.all([
+  const [totals, byShareholder, shareholderLoans, capitalInjections, repayments, capitalExpenses, interestPaid] = await Promise.all([
     getCapitalTotals(supabase),
     getShareholderSummaries(supabase),
+    listTransactionsByType(supabase, "shareholder_loan"),
     listTransactionsByType(supabase, "capital_injection"),
     listTransactionsByType(supabase, "loan_repayment"),
     listTransactionsByType(supabase, "capital_expense"),
@@ -25,7 +26,8 @@ export default async function CapitalPage() {
     <CapitalClient
       totals={totals}
       byShareholder={byShareholder}
-      loansIn={loansIn}
+      shareholderLoans={shareholderLoans}
+      capitalInjections={capitalInjections}
       repayments={repayments}
       capitalExpenses={capitalExpenses}
       interestPaid={interestPaid}

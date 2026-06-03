@@ -41,7 +41,8 @@ export type Category = IncomeCategory | ExpenseCategory;
 export const TRANSACTION_TYPES = [
   "income",
   "expense",
-  "capital_injection",
+  "shareholder_loan",     // 借款: repayable, has outstanding, earns interest
+  "capital_injection",    // 股本: equity, affects ownership, not repaid
   "capital_expense",
   "loan_repayment",
   "interest_paid",
@@ -51,9 +52,11 @@ export type TransactionType = (typeof TRANSACTION_TYPES)[number];
 /** Types whose movements live in / affect the Operating Pool + P&L. */
 export const OPERATING_TYPES = ["income", "expense", "interest_paid"] as const;
 /** Types whose movements live in / affect the Capital Pool (off P&L). */
-export const CAPITAL_TYPES = ["capital_injection", "capital_expense", "loan_repayment"] as const;
+export const CAPITAL_TYPES = ["shareholder_loan", "capital_injection", "capital_expense", "loan_repayment"] as const;
 /** Types that MUST carry a shareholder_id (DB + app both enforce). */
-export const SHAREHOLDER_TYPES = ["capital_injection", "loan_repayment", "interest_paid"] as const;
+export const SHAREHOLDER_TYPES = ["shareholder_loan", "capital_injection", "loan_repayment", "interest_paid"] as const;
+/** Inflows — money INTO the company (rendered + green). */
+export const INFLOW_TYPES = ["income", "shareholder_loan", "capital_injection"] as const;
 
 export function isOperatingType(t: TransactionType): boolean {
   return (OPERATING_TYPES as readonly string[]).includes(t);

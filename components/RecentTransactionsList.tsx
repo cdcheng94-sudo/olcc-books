@@ -20,8 +20,8 @@ export function RecentTransactionsList({ rows }: { rows: TransactionRow[] }) {
   return (
     <ul className="flex flex-col">
       {rows.map((tx, i) => {
-        // inflow = money into the company (income or shareholder loan in)
-        const isIncome = tx.type === "income" || tx.type === "capital_injection";
+        // inflow = money into the company (income, shareholder loan, equity)
+        const isIncome = tx.type === "income" || tx.type === "shareholder_loan" || tx.type === "capital_injection";
         return (
           <li
             key={tx.id}

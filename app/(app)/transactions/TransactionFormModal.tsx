@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  CATEGORIES, CAPITAL_CATEGORIES, LOAN_TYPES, TRANSACTION_TYPES,
+  CATEGORIES, CAPITAL_CATEGORIES, TRANSACTION_TYPES,
   type TransactionType,
 } from "@/lib/categories";
 import { todayIso, fmtMoney } from "@/lib/format";
@@ -40,8 +40,8 @@ type Props = {
   onSaved: (row: TransactionRow) => void;
 };
 
-const NEEDS_SHAREHOLDER: TransactionType[] = ["capital_injection", "loan_repayment", "interest_paid"];
-const NEEDS_RECEIPT:     TransactionType[] = ["income", "expense", "capital_injection", "capital_expense", "loan_repayment"];
+const NEEDS_SHAREHOLDER: TransactionType[] = ["shareholder_loan", "capital_injection", "loan_repayment", "interest_paid"];
+const NEEDS_RECEIPT:     TransactionType[] = ["income", "expense", "shareholder_loan", "capital_injection", "capital_expense", "loan_repayment"];
 
 export function TransactionFormModal({
   open, onOpenChange, editing, prefill, shareholders, outstandingMap, onShareholderAdded, onSaved,
@@ -54,7 +54,6 @@ export function TransactionFormModal({
   const [party,    setParty]    = useState("");
   const [note,     setNote]     = useState("");
   const [shareholderId, setShareholderId] = useState("");
-  const [loanType, setLoanType] = useState<string>("director_loan");
   const [interestRate, setInterestRate]   = useState("0");
   const [file,     setFile]     = useState<File | null>(null);
   const [existingReceiptUrl, setExistingReceiptUrl] = useState<string>("");
@@ -82,7 +81,6 @@ export function TransactionFormModal({
       setParty(editing.party || "");
       setNote(editing.note || "");
       setShareholderId(editing.shareholder_id || "");
-      setLoanType(editing.loan_type || "director_loan");
       setInterestRate(String(editing.interest_rate ?? 0));
       setExistingReceiptUrl(editing.receipt_url || "");
     } else {
@@ -94,7 +92,6 @@ export function TransactionFormModal({
       setParty(prefill?.party ?? "");
       setNote(prefill?.note ?? "");
       setShareholderId("");
-      setLoanType("director_loan");
       setInterestRate("0");
       setExistingReceiptUrl("");
     }
@@ -157,8 +154,7 @@ export function TransactionFormModal({
           note: note.trim() || undefined,
           receipt_url: receiptUrl,
           shareholder_id: NEEDS_SHAREHOLDER.includes(type) ? (shareholderId || undefined) : undefined,
-          loan_type: type === "capital_injection" ? loanType : undefined,
-          interest_rate: type === "capital_injection" ? Number(interestRate) : undefined,
+          interest_rate: type === "shareholder_loan" ? Number(interestRate) : undefined,
         };
         const saved = editing
           ? await updateTransaction(editing.id, payload)
@@ -173,7 +169,7 @@ export function TransactionFormModal({
   const showCategory   = type === "income" || type === "expense" || type === "capital_expense";
   const showParty      = type === "income" || type === "expense" || type === "capital_expense";
   const showShareholder= NEEDS_SHAREHOLDER.includes(type);
-  const showLoanFields = type === "capital_injection";
+  const showInterestRate = type === "shareholder_loan";
   const showReceipt    = NEEDS_RECEIPT.includes(type);
   const noteLabel      = type === "interest_paid" ? t.capital.periodNote : t.tx.note;
   const notePlaceholder= type === "interest_paid" ? t.capital.periodPlaceholder : t.tx.notePlaceholder;
@@ -260,19 +256,11 @@ export function TransactionFormModal({
               </div>
             )}
 
-            {showLoanFields && (
-              <>
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs">{t.capital.loanTypeCol}</Label>
-                  <select value={loanType} onChange={(e) => setLoanType(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
-                    {LOAN_TYPES.map((lt) => <option key={lt} value={lt}>{t.loanType[lt]}</option>)}
-                  </select>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs">{t.capital.interestRate}</Label>
-                  <Input type="number" step="0.01" min="0" value={interestRate} onChange={(e) => setInterestRate(e.target.value)} />
-                </div>
-              </>
+            {showInterestRate && (
+              <div className="flex flex-col gap-1 col-span-2">
+                <Label className="text-xs">{t.capital.interestRate}</Label>
+                <Input type="number" step="0.01" min="0" value={interestRate} onChange={(e) => setInterestRate(e.target.value)} />
+              </div>
             )}
 
             {showParty && (

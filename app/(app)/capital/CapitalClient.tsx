@@ -14,22 +14,24 @@ import type { CapitalTotals, ShareholderSummary } from "@/lib/queries/capital";
 type Row = TransactionRow & { shareholder_name: string | null };
 
 type Props = {
-  totals:          CapitalTotals;
-  byShareholder:   ShareholderSummary[];
-  loansIn:         Row[];
-  repayments:      Row[];
-  capitalExpenses: Row[];
-  interestPaid:    Row[];
+  totals:            CapitalTotals;
+  byShareholder:     ShareholderSummary[];
+  shareholderLoans:  Row[];
+  capitalInjections: Row[];
+  repayments:        Row[];
+  capitalExpenses:   Row[];
+  interestPaid:      Row[];
 };
 
-type TabKey = "loansIn" | "repayments" | "capitalExp" | "interest" | "byShareholder";
+type TabKey = "loans" | "injections" | "repayments" | "capitalExp" | "interest" | "byShareholder";
 
-export function CapitalClient({ totals, byShareholder, loansIn, repayments, capitalExpenses, interestPaid }: Props) {
+export function CapitalClient({ totals, byShareholder, shareholderLoans, capitalInjections, repayments, capitalExpenses, interestPaid }: Props) {
   const { t } = useLang();
-  const [tab, setTab] = useState<TabKey>("loansIn");
+  const [tab, setTab] = useState<TabKey>("loans");
 
   const tabs: { key: TabKey; label: string; addType?: string }[] = [
-    { key: "loansIn",       label: t.capital.tabLoansIn,       addType: "capital_injection" },
+    { key: "loans",         label: t.capital.tabLoansIn,       addType: "shareholder_loan" },
+    { key: "injections",    label: t.capital.tabCapInjection,  addType: "capital_injection" },
     { key: "repayments",    label: t.capital.tabRepayments,    addType: "loan_repayment" },
     { key: "capitalExp",    label: t.capital.tabCapitalExp,    addType: "capital_expense" },
     { key: "interest",      label: t.capital.tabInterest,      addType: "interest_paid" },
@@ -80,7 +82,8 @@ export function CapitalClient({ totals, byShareholder, loansIn, repayments, capi
       )}
 
       <Card>
-        {tab === "loansIn"       && <LoansInTable rows={loansIn} t={t} />}
+        {tab === "loans"         && <LoansInTable rows={shareholderLoans} t={t} />}
+        {tab === "injections"    && <InjectionsTable rows={capitalInjections} t={t} />}
         {tab === "repayments"    && <RepaymentsTable rows={repayments} t={t} />}
         {tab === "capitalExp"    && <CapitalExpTable rows={capitalExpenses} t={t} capLabel={capLabel} />}
         {tab === "interest"      && <InterestTable rows={interestPaid} t={t} />}
@@ -116,7 +119,6 @@ function LoansInTable({ rows, t }: { rows: Row[]; t: T }) {
       <thead className={THEAD}><tr>
         <th className={TH + " w-[110px]"}>{t.tx.date}</th>
         <th className={TH}>{t.capital.shareholder}</th>
-        <th className={TH + " w-[140px]"}>{t.capital.loanTypeCol}</th>
         <th className={"text-right px-4 py-3 font-medium w-[140px]"}>{t.tx.amount}</th>
         <th className={TH}>{t.tx.note}</th>
       </tr></thead>
@@ -125,8 +127,30 @@ function LoansInTable({ rows, t }: { rows: Row[]; t: T }) {
           <tr key={r.id} className="border-t border-border hover:bg-muted/20">
             <td className="px-4 py-3 whitespace-nowrap">{fmtDate(r.date)}</td>
             <td className="px-4 py-3 font-medium">{r.shareholder_name || "—"}</td>
-            <td className="px-4 py-3 text-muted-foreground">{r.loan_type ? t.loanType[r.loan_type as keyof typeof t.loanType] : "—"}</td>
             <td className="px-4 py-3 text-right tabular-nums font-semibold text-navy">{fmtMoney(r.amount)}</td>
+            <td className="px-4 py-3 text-muted-foreground">{r.note || "—"}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function InjectionsTable({ rows, t }: { rows: Row[]; t: T }) {
+  return (
+    <table className="w-full text-sm">
+      <thead className={THEAD}><tr>
+        <th className={TH + " w-[110px]"}>{t.tx.date}</th>
+        <th className={TH}>{t.capital.shareholder}</th>
+        <th className={"text-right px-4 py-3 font-medium w-[140px]"}>{t.tx.amount}</th>
+        <th className={TH}>{t.tx.note}</th>
+      </tr></thead>
+      <tbody>
+        {rows.length === 0 ? <Empty t={t} /> : rows.map((r) => (
+          <tr key={r.id} className="border-t border-border hover:bg-muted/20">
+            <td className="px-4 py-3 whitespace-nowrap">{fmtDate(r.date)}</td>
+            <td className="px-4 py-3 font-medium">{r.shareholder_name || "—"}</td>
+            <td className="px-4 py-3 text-right tabular-nums font-semibold text-sky-700">{fmtMoney(r.amount)}</td>
             <td className="px-4 py-3 text-muted-foreground">{r.note || "—"}</td>
           </tr>
         ))}
@@ -212,17 +236,19 @@ function ByShareholderTable({ rows, t }: { rows: ShareholderSummary[]; t: T }) {
       <thead className={THEAD}><tr>
         <th className={TH}>{t.capital.shareholder}</th>
         <th className={"text-right px-4 py-3 font-medium"}>{t.capital.totalBorrowed}</th>
+        <th className={"text-right px-4 py-3 font-medium"}>{t.capital.equityCol}</th>
         <th className={"text-right px-4 py-3 font-medium"}>{t.capital.totalRepaid}</th>
         <th className={"text-right px-4 py-3 font-medium"}>{t.capital.interestReceived}</th>
         <th className={"text-right px-4 py-3 font-medium"}>{t.capital.outstanding}</th>
       </tr></thead>
       <tbody>
         {rows.length === 0 ? (
-          <tr><td colSpan={5} className="text-center text-muted-foreground italic py-12">{t.capital.noRecords}</td></tr>
+          <tr><td colSpan={6} className="text-center text-muted-foreground italic py-12">{t.capital.noRecords}</td></tr>
         ) : rows.map((s) => (
           <tr key={s.id} className="border-t border-border hover:bg-muted/20">
             <td className="px-4 py-3 font-medium">{s.name}</td>
             <td className="px-4 py-3 text-right tabular-nums text-navy">{fmtMoney(s.totalBorrowed)}</td>
+            <td className="px-4 py-3 text-right tabular-nums text-sky-700">{fmtMoney(s.equity)}</td>
             <td className="px-4 py-3 text-right tabular-nums text-success">{fmtMoney(s.totalRepaid)}</td>
             <td className="px-4 py-3 text-right tabular-nums text-rose-600">{fmtMoney(s.interestReceived)}</td>
             <td className="px-4 py-3 text-right tabular-nums font-bold text-gold">{fmtMoney(s.outstanding)}</td>

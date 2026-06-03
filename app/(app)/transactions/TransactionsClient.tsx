@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useLang } from "@/components/LangProvider";
 import { fmtDate, fmtMoney, isoMonth } from "@/lib/format";
-import { TRANSACTION_TYPES, CAPITAL_CATEGORIES, type TransactionType } from "@/lib/categories";
+import { TRANSACTION_TYPES, CAPITAL_CATEGORIES, INFLOW_TYPES, type TransactionType } from "@/lib/categories";
 import type { TransactionRow, ShareholderRow } from "@/lib/types";
 import { deleteTransaction } from "./actions";
 import { TransactionFormModal, type TxPrefill } from "./TransactionFormModal";
@@ -23,7 +23,8 @@ type Props = {
 const TYPE_BADGE: Record<TransactionType, string> = {
   income:            "bg-success-soft text-success",
   expense:           "bg-danger-soft text-danger",
-  capital_injection: "bg-primary/10 text-navy",
+  shareholder_loan:  "bg-primary/10 text-navy",
+  capital_injection: "bg-sky-100 text-sky-700",
   capital_expense:   "bg-warning-soft text-warning",
   loan_repayment:    "bg-purple-100 text-purple-700",
   interest_paid:     "bg-rose-100 text-rose-700",
@@ -135,10 +136,9 @@ export function TransactionsClient({ initialRows, shareholders: initialSharehold
     if (r.shareholder_id && shareholderNames[r.shareholder_id]) return shareholderNames[r.shareholder_id];
     return r.party || "—";
   }
-  const signFor = (ty: TransactionType) =>
-    ty === "income" || ty === "capital_injection" ? "+" : "−";
-  const colorFor = (ty: TransactionType) =>
-    ty === "income" || ty === "capital_injection" ? "text-success" : "text-danger";
+  const isInflow = (ty: TransactionType) => (INFLOW_TYPES as readonly string[]).includes(ty);
+  const signFor  = (ty: TransactionType) => (isInflow(ty) ? "+" : "−");
+  const colorFor = (ty: TransactionType) => (isInflow(ty) ? "text-success" : "text-danger");
 
   return (
     <div>

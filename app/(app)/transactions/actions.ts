@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import {
   CATEGORIES,
-  LOAN_TYPES,
   CAPITAL_CATEGORIES,
   requiresShareholder,
   type TransactionType,
@@ -60,7 +59,7 @@ function validate(input: TxInput): CleanTx {
 
   let category: string | null = null;
   let shareholder_id: string | null = null;
-  let loan_type: string | null = null;
+  const loan_type: string | null = null;   // retired field; kept null for the column
   let interest_rate = 0;
 
   switch (input.type) {
@@ -80,12 +79,18 @@ function validate(input: TxInput): CleanTx {
       category = input.category;
       break;
     }
-    case "capital_injection": {
-      if (!input.shareholder_id) throw new Error("Shareholder is required for a capital injection.");
+    case "shareholder_loan": {
+      // 借款 — repayable, may carry a (reserved) interest rate.
+      if (!input.shareholder_id) throw new Error("Shareholder is required for a shareholder loan.");
       shareholder_id = input.shareholder_id;
-      loan_type = input.loan_type && LOAN_TYPES.includes(input.loan_type as never) ? input.loan_type : "director_loan";
       const r = Number(input.interest_rate);
       interest_rate = isFinite(r) && r >= 0 ? +r.toFixed(2) : 0;
+      break;
+    }
+    case "capital_injection": {
+      // 股本 / equity — no interest, no repayment.
+      if (!input.shareholder_id) throw new Error("Shareholder is required for a capital injection.");
+      shareholder_id = input.shareholder_id;
       break;
     }
     case "loan_repayment":

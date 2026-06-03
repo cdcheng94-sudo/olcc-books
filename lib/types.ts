@@ -22,6 +22,7 @@ export type ShareholderRow = {
 export type TransactionType =
   | "income"
   | "expense"
+  | "shareholder_loan"
   | "capital_injection"
   | "capital_expense"
   | "loan_repayment"

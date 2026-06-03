@@ -2,12 +2,13 @@
  * Capital / Operating dual-pool analytics.
  *
  * Fund pools:
- *   Capital Pool   = Σcapital_injection − Σcapital_expense − Σloan_repayment
+ *   Capital Pool   = Σshareholder_loan + Σcapital_injection − Σcapital_expense − Σloan_repayment
  *   Operating Pool = Σincome − Σexpense − Σinterest_paid
  *   Total          = Capital Pool + Operating Pool
  *
- * Director's Loan Account, per shareholder:
- *   Outstanding = Σcapital_injection − Σloan_repayment   (interest does NOT reduce it)
+ * Director's Loan Account, per shareholder (LOANS only — equity/股本 is
+ * NOT a repayable balance):
+ *   Outstanding = Σshareholder_loan − Σloan_repayment   (interest does NOT reduce it)
  *   Interest Received = Σinterest_paid
  *
  * Everything is computed in JS over a narrow SELECT — volumes are tiny.
@@ -35,7 +36,7 @@ export async function getFundPools(supabase: SupabaseClient): Promise<FundPools>
   if (error) throw new Error(error.message);
   const s = sumByType((data || []) as TypeAmount[]);
 
-  const capitalPool   = (s.capital_injection || 0) - (s.capital_expense || 0) - (s.loan_repayment || 0);
+  const capitalPool   = (s.shareholder_loan || 0) + (s.capital_injection || 0) - (s.capital_expense || 0) - (s.loan_repayment || 0);
   const operatingPool = (s.income || 0) - (s.expense || 0) - (s.interest_paid || 0);
   return {
     capitalPool:   +capitalPool.toFixed(2),
@@ -56,8 +57,8 @@ export async function getShareholderOutstanding(supabase: SupabaseClient, shareh
   if (error) throw new Error(error.message);
   let borrowed = 0, repaid = 0;
   for (const r of (data || []) as TypeAmount[]) {
-    if (r.type === "capital_injection") borrowed += Number(r.amount) || 0;
-    if (r.type === "loan_repayment")    repaid   += Number(r.amount) || 0;
+    if (r.type === "shareholder_loan") borrowed += Number(r.amount) || 0;   // equity excluded
+    if (r.type === "loan_repayment")   repaid   += Number(r.amount) || 0;
   }
   return +(borrowed - repaid).toFixed(2);
 }
@@ -65,10 +66,11 @@ export async function getShareholderOutstanding(supabase: SupabaseClient, shareh
 export type ShareholderSummary = {
   id:               string;
   name:             string;
-  totalBorrowed:    number;
+  totalBorrowed:    number;       // Σshareholder_loan (loans only, not equity)
+  equity:           number;       // Σcapital_injection (paid-up capital)
   totalRepaid:      number;
   interestReceived: number;
-  outstanding:      number;
+  outstanding:      number;       // totalBorrowed − totalRepaid
 };
 
 export async function getShareholderSummaries(supabase: SupabaseClient): Promise<ShareholderSummary[]> {
@@ -82,7 +84,7 @@ export async function getShareholderSummaries(supabase: SupabaseClient): Promise
   const shareholders = (shs || []) as ShareholderRow[];
   const byId = new Map<string, ShareholderSummary>(
     shareholders.map((s) => [s.id, {
-      id: s.id, name: s.name, totalBorrowed: 0, totalRepaid: 0, interestReceived: 0, outstanding: 0,
+      id: s.id, name: s.name, totalBorrowed: 0, equity: 0, totalRepaid: 0, interestReceived: 0, outstanding: 0,
     }]),
   );
 
@@ -91,13 +93,15 @@ export async function getShareholderSummaries(supabase: SupabaseClient): Promise
     const row = byId.get(t.shareholder_id);
     if (!row) continue;
     const amt = Number(t.amount) || 0;
-    if (t.type === "capital_injection") row.totalBorrowed    += amt;
+    if (t.type === "shareholder_loan")  row.totalBorrowed    += amt;   // loans only
+    if (t.type === "capital_injection") row.equity           += amt;   // equity / 股本
     if (t.type === "loan_repayment")    row.totalRepaid      += amt;
     if (t.type === "interest_paid")     row.interestReceived += amt;
   }
 
   for (const row of byId.values()) {
     row.totalBorrowed    = +row.totalBorrowed.toFixed(2);
+    row.equity           = +row.equity.toFixed(2);
     row.totalRepaid      = +row.totalRepaid.toFixed(2);
     row.interestReceived = +row.interestReceived.toFixed(2);
     row.outstanding      = +(row.totalBorrowed - row.totalRepaid).toFixed(2);
@@ -115,7 +119,7 @@ export async function getCapitalTotals(supabase: SupabaseClient): Promise<Capita
   const { data, error } = await supabase.from("transactions").select("type, amount");
   if (error) throw new Error(error.message);
   const s = sumByType((data || []) as TypeAmount[]);
-  const totalBorrowed = s.capital_injection || 0;
+  const totalBorrowed = s.shareholder_loan || 0;   // loans only, not equity
   const totalRepaid   = s.loan_repayment || 0;
   return {
     totalBorrowed: +totalBorrowed.toFixed(2),
