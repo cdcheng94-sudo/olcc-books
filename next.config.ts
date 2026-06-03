@@ -19,7 +19,7 @@ const nextConfig: NextConfig = {
   // @react-pdf/renderer carries native font assets + a large dep tree. Tell
   // Next to load it via require() at runtime instead of bundling it into the
   // serverless function — keeps function size under Vercel's Hobby limit.
-  serverExternalPackages: ["@react-pdf/renderer"],
+  serverExternalPackages: ["@react-pdf/renderer", "googleapis"],
 };
 
 export default nextConfig;

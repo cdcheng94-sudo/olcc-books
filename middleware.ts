@@ -24,6 +24,6 @@ export const config = {
     //   - manifest.webmanifest MUST stay public — otherwise Android Chrome's
     //     "Add to Home Screen" can't read it and falls back to a default
     //     icon instead of the OLCC logo.
-    "/((?!_next/static|_next/image|api/cron|favicon\\.ico|icon\\.png|apple-icon\\.png|manifest\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|api/cron|api/drive|favicon\\.ico|icon\\.png|apple-icon\\.png|manifest\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
