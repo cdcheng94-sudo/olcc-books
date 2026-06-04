@@ -14,7 +14,7 @@ import {
   type TransactionType,
 } from "@/lib/categories";
 import { todayIso, fmtMoney } from "@/lib/format";
-import { createClient } from "@/lib/supabase/client";
+import { uploadReceiptToDrive } from "@/lib/upload-receipt";
 import type { TransactionRow, ShareholderRow } from "@/lib/types";
 import { createTransaction, updateTransaction } from "./actions";
 import { createShareholder } from "../shareholders/actions";
@@ -34,17 +34,22 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   editing: TransactionRow | null;
   prefill?: TxPrefill | null;
+  prefillFile?: File | null;                  // scanned image carried over from OCR
   shareholders: ShareholderRow[];
   outstandingMap: Record<string, number>;     // shareholder_id → outstanding
   onShareholderAdded: (s: ShareholderRow) => void;
   onSaved: (row: TransactionRow) => void;
 };
 
+function driveCategoryFor(type: TransactionType): "Receipts" | "Capital" {
+  return (type === "income" || type === "expense") ? "Receipts" : "Capital";
+}
+
 const NEEDS_SHAREHOLDER: TransactionType[] = ["shareholder_loan", "capital_injection", "loan_repayment", "interest_paid"];
 const NEEDS_RECEIPT:     TransactionType[] = ["income", "expense", "shareholder_loan", "capital_injection", "capital_expense", "loan_repayment"];
 
 export function TransactionFormModal({
-  open, onOpenChange, editing, prefill, shareholders, outstandingMap, onShareholderAdded, onSaved,
+  open, onOpenChange, editing, prefill, prefillFile, shareholders, outstandingMap, onShareholderAdded, onSaved,
 }: Props) {
   const { t } = useLang();
   const [date,     setDate]     = useState(todayIso());
@@ -58,6 +63,7 @@ export function TransactionFormModal({
   const [file,     setFile]     = useState<File | null>(null);
   const [existingReceiptUrl, setExistingReceiptUrl] = useState<string>("");
   const [confirmNoReceipt, setConfirmNoReceipt] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading">("idle");
   const [error,    setError]    = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -70,7 +76,8 @@ export function TransactionFormModal({
     if (!open) return;
     setError(null);
     setConfirmNoReceipt(false);
-    setFile(null);
+    setUploadStatus("idle");
+    setFile(editing ? null : (prefillFile ?? null));   // carry the scanned image in as the receipt
     setAddingSh(false);
     setNewShName("");
     if (editing) {
@@ -95,7 +102,7 @@ export function TransactionFormModal({
       setInterestRate("0");
       setExistingReceiptUrl("");
     }
-  }, [open, editing, prefill]);
+  }, [open, editing, prefill, prefillFile]);
 
   // Snap category to a valid value for the current type.
   useEffect(() => {
@@ -103,19 +110,6 @@ export function TransactionFormModal({
     else if (type === "expense" && !CATEGORIES.expense.includes(category as never)) setCategory(CATEGORIES.expense[0]);
     else if (type === "capital_expense" && !CAPITAL_CATEGORIES.includes(category as never)) setCategory(CAPITAL_CATEGORIES[0]);
   }, [type, category]);
-
-  async function uploadReceiptIfAny(): Promise<string | undefined> {
-    if (!file) return existingReceiptUrl || undefined;
-    const supabase = createClient();
-    const ext = file.name.split(".").pop() || "bin";
-    const today = new Date();
-    const ym = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
-    const path = `${ym}/${crypto.randomUUID()}.${ext}`;
-    const { error: upErr } = await supabase.storage.from("receipts").upload(path, file, { cacheControl: "3600", upsert: false });
-    if (upErr) throw new Error("Upload failed: " + upErr.message);
-    const { data: pub } = supabase.storage.from("receipts").getPublicUrl(path);
-    return pub.publicUrl;
-  }
 
   function addShareholder() {
     if (!newShName.trim()) return;
@@ -144,7 +138,7 @@ export function TransactionFormModal({
     setError(null);
     startTransition(async () => {
       try {
-        const receiptUrl = NEEDS_RECEIPT.includes(type) ? await uploadReceiptIfAny() : undefined;
+        // 1. write the row first (keep any existing receipt link on edit)
         const payload = {
           date,
           type,
@@ -152,15 +146,41 @@ export function TransactionFormModal({
           amount: Number(amount),
           party: (type === "income" || type === "expense" || type === "capital_expense") ? (party.trim() || undefined) : undefined,
           note: note.trim() || undefined,
-          receipt_url: receiptUrl,
+          receipt_url: editing ? (existingReceiptUrl || undefined) : undefined,
           shareholder_id: NEEDS_SHAREHOLDER.includes(type) ? (shareholderId || undefined) : undefined,
           interest_rate: type === "shareholder_loan" ? Number(interestRate) : undefined,
         };
-        const saved = editing
+        const saved = (editing
           ? await updateTransaction(editing.id, payload)
-          : await createTransaction(payload);
-        onSaved(saved as TransactionRow);
+          : await createTransaction(payload)) as TransactionRow;
+
+        // 2. if a new receipt file is attached, upload it to Drive
+        if (file && NEEDS_RECEIPT.includes(type)) {
+          setUploadStatus("uploading");
+          const shName = shareholderId ? shareholders.find((s) => s.id === shareholderId)?.name : null;
+          const res = await uploadReceiptToDrive({
+            file,
+            category: driveCategoryFor(type),
+            linkedTable: "transactions",
+            linkedId: saved.id,
+            dateIso: date,
+            party: party.trim() || shName || null,
+            docType: type,
+          });
+          setUploadStatus("idle");
+          if (res.ok) {
+            saved.receipt_url = res.webViewLink;
+          } else {
+            // Row is saved; receipt failed. Surface a soft warning, still close.
+            const msg = res.kind === "auth"  ? t.tx.driveAuthErr
+                      : res.kind === "quota" ? t.tx.driveQuotaErr
+                      : t.tx.driveUploadErr;
+            alert(msg);
+          }
+        }
+        onSaved(saved);
       } catch (e) {
+        setUploadStatus("idle");
         setError((e as Error).message);
       }
     });
@@ -292,7 +312,7 @@ export function TransactionFormModal({
             <DialogFooter className="col-span-2 mt-2">
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isPending}>{t.common.cancel}</Button>
               <Button type="submit" disabled={isPending || addingSh} className="bg-navy hover:bg-navy-light text-white">
-                {isPending ? t.common.saving : t.common.save}
+                {uploadStatus === "uploading" ? t.tx.uploadingReceipt : isPending ? t.common.saving : t.common.save}
               </Button>
             </DialogFooter>
           </form>

@@ -1,16 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { Plus, Pencil, Trash2, ScanLine } from "lucide-react";
+import { Plus, Pencil, Trash2, ScanLine, Upload, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useLang } from "@/components/LangProvider";
 import { fmtDate, fmtMoney, isoMonth } from "@/lib/format";
-import { TRANSACTION_TYPES, CAPITAL_CATEGORIES, INFLOW_TYPES, type TransactionType } from "@/lib/categories";
+import { TRANSACTION_TYPES, CAPITAL_CATEGORIES, CAPITAL_TYPES, INFLOW_TYPES, type TransactionType } from "@/lib/categories";
 import type { TransactionRow, ShareholderRow } from "@/lib/types";
 import { deleteTransaction } from "./actions";
 import { TransactionFormModal, type TxPrefill } from "./TransactionFormModal";
+import { uploadReceiptToDrive } from "@/lib/upload-receipt";
+
+const driveCategoryFor = (ty: TransactionType): "Receipts" | "Capital" =>
+  (CAPITAL_TYPES as readonly string[]).includes(ty) ? "Capital" : "Receipts";
 
 type Props = {
   initialRows: TransactionRow[];
@@ -38,10 +42,14 @@ export function TransactionsClient({ initialRows, shareholders: initialSharehold
   const [typeSet, setTypeSet] = useState<Set<TransactionType>>(new Set(TRANSACTION_TYPES));
   const [editing, setEditing] = useState<TransactionRow | null>(null);
   const [prefill, setPrefill] = useState<TxPrefill | null>(null);
+  const [prefillFile, setPrefillFile] = useState<File | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [scanning, setScanning] = useState(false);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
+  const reuploadRef = useRef<HTMLInputElement>(null);
+  const reuploadRowRef = useRef<TransactionRow | null>(null);
 
   // Re-fetch by month (type filter is applied in-memory below).
   useEffect(() => {
@@ -81,8 +89,8 @@ export function TransactionsClient({ initialRows, shareholders: initialSharehold
     });
   }
 
-  function openNew()  { setEditing(null); setPrefill(null); setModalOpen(true); }
-  function openEdit(row: TransactionRow) { setEditing(row); setPrefill(null); setModalOpen(true); }
+  function openNew()  { setEditing(null); setPrefill(null); setPrefillFile(null); setModalOpen(true); }
+  function openEdit(row: TransactionRow) { setEditing(row); setPrefill(null); setPrefillFile(null); setModalOpen(true); }
 
   function onSaved(saved: TransactionRow) {
     setRows((prev) => {
@@ -94,7 +102,8 @@ export function TransactionsClient({ initialRows, shareholders: initialSharehold
   }
 
   function onDelete(row: TransactionRow) {
-    if (!confirm(t.tx.confirmDeleteTx)) return;
+    const msg = row.receipt_url ? t.tx.confirmDeleteWithFile : t.tx.confirmDeleteTx;
+    if (!confirm(msg)) return;
     startTransition(async () => {
       try {
         await deleteTransaction(row.id);
@@ -117,11 +126,48 @@ export function TransactionsClient({ initialRows, shareholders: initialSharehold
       if (!res.ok || !json.ok) throw new Error(json.error || "Scan failed");
       setEditing(null);
       setPrefill(json.parsed as TxPrefill);
+      setPrefillFile(f);            // keep the scanned image → upload to Drive on save
       setModalOpen(true);
     } catch (err) {
       alert(t.errors.scanFailed + (err as Error).message);
     } finally {
       setScanning(false);
+    }
+  }
+
+  // 补传 — attach a receipt to an existing row that has no file yet.
+  function pickReupload(row: TransactionRow) {
+    reuploadRowRef.current = row;
+    reuploadRef.current?.click();
+  }
+  async function onReuploadFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    const row = reuploadRowRef.current;
+    reuploadRowRef.current = null;
+    if (!f || !row) return;
+    setUploadingId(row.id);
+    try {
+      const party = (row.shareholder_id && shareholderNames[row.shareholder_id]) || row.party || null;
+      const res = await uploadReceiptToDrive({
+        file: f,
+        category: driveCategoryFor(row.type),
+        linkedTable: "transactions",
+        linkedId: row.id,
+        dateIso: row.date,
+        party,
+        docType: row.type,
+      });
+      if (res.ok) {
+        setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, receipt_url: res.webViewLink } : r)));
+      } else {
+        const k = res.kind;
+        alert(k === "auth" ? t.tx.driveAuthErr : k === "quota" ? t.tx.driveQuotaErr : t.tx.driveUploadErr);
+      }
+    } catch (err) {
+      alert(t.tx.driveUploadErr + " " + (err as Error).message);
+    } finally {
+      setUploadingId(null);
     }
   }
 
@@ -220,9 +266,19 @@ export function TransactionsClient({ initialRows, shareholders: initialSharehold
                 <td className="px-4 py-3">{partyLabel(r)}</td>
                 <td className="px-4 py-3 text-muted-foreground">{r.note || "—"}</td>
                 <td className="px-4 py-3">
-                  {r.receipt_url
-                    ? <a href={r.receipt_url} target="_blank" rel="noreferrer" className="text-navy hover:text-gold underline">{t.actions.view}</a>
-                    : <span className="text-muted-foreground">—</span>}
+                  {r.receipt_url ? (
+                    <a href={r.receipt_url} target="_blank" rel="noreferrer" title={t.tx.openInDrive}
+                      className="text-navy hover:text-gold underline">{t.actions.view}</a>
+                  ) : uploadingId === r.id ? (
+                    <span className="inline-flex items-center text-muted-foreground text-xs">
+                      <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />{t.tx.uploadingReceipt}
+                    </span>
+                  ) : (
+                    <button type="button" onClick={() => pickReupload(r)} title={t.tx.uploadReceipt}
+                      className="inline-flex items-center text-muted-foreground hover:text-navy text-xs">
+                      <Upload className="w-3.5 h-3.5 mr-1" />{t.tx.uploadReceipt}
+                    </button>
+                  )}
                 </td>
                 <td className="px-2 py-3 text-right">
                   <button onClick={() => openEdit(r)} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-navy" title={t.common.edit}>
@@ -238,11 +294,15 @@ export function TransactionsClient({ initialRows, shareholders: initialSharehold
         </table>
       </Card>
 
+      {/* hidden input for 补传 (supplemental receipt upload) */}
+      <input ref={reuploadRef} type="file" accept="image/*,application/pdf" capture="environment" onChange={onReuploadFile} className="hidden" />
+
       <TransactionFormModal
         open={modalOpen}
         onOpenChange={setModalOpen}
         editing={editing}
         prefill={prefill}
+        prefillFile={prefillFile}
         shareholders={shareholders}
         outstandingMap={outstandingMap}
         onShareholderAdded={(s) => setShareholders((prev) => [...prev, s])}

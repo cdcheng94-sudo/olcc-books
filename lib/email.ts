@@ -133,6 +133,31 @@ export async function sendSubscriptionReminder(opts: {
   return data;
 }
 
+export async function sendDriveAlertEmail(opts: { to: string; kind: "auth" | "quota" }) {
+  const resend = client();
+  const subject = opts.kind === "auth"
+    ? "⚠️ OLCC Books: Google Drive authorization expired — re-authorize"
+    : "⚠️ OLCC Books: Google Drive storage quota full";
+  const body = opts.kind === "auth"
+    ? [
+        "Google Drive uploads are failing because the authorization (refresh token) has expired or been revoked.",
+        "",
+        "To fix:",
+        "1. Visit https://olcc-books.vercel.app/api/drive/setup-token?secret=<DRIVE_SETUP_SECRET>",
+        "2. Authorize with the archive account again",
+        "3. Copy the new refresh token into Vercel as GOOGLE_DRIVE_REFRESH_TOKEN, then Redeploy",
+        "",
+        "Until then, receipts are NOT uploaded (transactions still save; use the 'Upload receipt' button to retry later).",
+      ].join("\n")
+    : [
+        "Google Drive uploads are failing because the archive account's storage is full.",
+        "",
+        "Free up space in that Google account or upgrade its storage. Until then receipts are NOT uploaded.",
+      ].join("\n");
+  const { error } = await resend.emails.send({ from: FROM, to: opts.to, subject, text: body });
+  if (error) throw new Error(`Resend error: ${error.message}`);
+}
+
 export async function sendRecurringDigest(opts: {
   to:    string;
   items: Array<{ name: string; payee: string; amount: string; dueDate: string; daysLabel: string }>;

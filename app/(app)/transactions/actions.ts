@@ -9,6 +9,7 @@ import {
   type TransactionType,
 } from "@/lib/categories";
 import { getShareholderOutstanding } from "@/lib/queries/capital";
+import { deleteLinkedDriveFiles } from "@/lib/drive-cleanup";
 
 /**
  * Server actions for Transactions CRUD across all 6 types
@@ -204,6 +205,7 @@ export async function updateTransaction(id: string, input: TxInput) {
 
 export async function deleteTransaction(id: string) {
   const supabase = await createClient();
+  await deleteLinkedDriveFiles(supabase, "transactions", id);   // best-effort Drive cleanup
   const { error } = await supabase.from("transactions").delete().eq("id", id);
   if (error) throw new Error(error.message);
 
