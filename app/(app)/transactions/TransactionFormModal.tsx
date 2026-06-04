@@ -219,10 +219,8 @@ export function TransactionFormModal({
                 onChange={(e) => setType(e.target.value as TransactionType)}
                 className="h-9 rounded-md border border-input bg-background px-3 text-sm"
               >
-                {TRANSACTION_TYPES.map((ty, i) => (
-                  <option key={ty} value={ty}>
-                    {i === 2 ? "──────────  " : ""}{t.txType[ty]}
-                  </option>
+                {TRANSACTION_TYPES.map((ty) => (
+                  <option key={ty} value={ty}>{t.txType[ty]}</option>
                 ))}
               </select>
               <div className="text-[11px] text-muted-foreground italic">{t.txTypeHelp[type]}</div>
