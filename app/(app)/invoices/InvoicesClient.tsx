@@ -8,15 +8,14 @@ import { useLang } from "@/components/LangProvider";
 import { interp } from "@/lib/i18n";
 import { fmtDate, fmtMoney } from "@/lib/format";
 import { daysUntilDue } from "@/lib/recurring-utils";
-import { PAYMENT_METHODS } from "@/lib/categories";
 import type { InvoiceRow, InvoiceStatus } from "@/lib/types";
 import {
   deleteInvoice,
   getInvoiceDownloadUrl,
   sendInvoiceByEmail,
-  markInvoicePaid,
 } from "./actions";
 import { InvoiceFormModal } from "./InvoiceFormModal";
+import { MarkPaidModal } from "./MarkPaidModal";
 
 type Filter = InvoiceStatus | "all";
 
@@ -32,6 +31,8 @@ export function InvoicesClient({ initialRows }: { initialRows: InvoiceRow[] }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [editing, setEditing] = useState<InvoiceRow | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [payingInvoice, setPayingInvoice] = useState<InvoiceRow | null>(null);
+  const [payModalOpen, setPayModalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const visibleRows = useMemo(
@@ -106,23 +107,12 @@ export function InvoicesClient({ initialRows }: { initialRows: InvoiceRow[] }) {
   }
 
   function onMarkPaid(row: InvoiceRow) {
-    const method = prompt(
-      interp(t.invoice.markPaidPrompt, {
-        number:  row.invoice_number,
-        amount:  fmtMoney(row.total),
-        methods: PAYMENT_METHODS.join(", "),
-      }),
-      "Bank Transfer",
-    );
-    if (!method) return;
-    if (!PAYMENT_METHODS.includes(method as never)) { alert(t.invoice.markPaidUnknown); return; }
-    startTransition(async () => {
-      try {
-        await markInvoicePaid(row.id, method);
-        setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, status: "paid" } : r));
-        alert(t.invoice.markPaidOk);
-      } catch (e) { alert(t.errors.markPaidFailed + (e as Error).message); }
-    });
+    setPayingInvoice(row);
+    setPayModalOpen(true);
+  }
+
+  function onPaid(invoiceId: string) {
+    setRows((prev) => prev.map((r) => r.id === invoiceId ? { ...r, status: "paid" } : r));
   }
 
   return (
@@ -216,6 +206,7 @@ export function InvoicesClient({ initialRows }: { initialRows: InvoiceRow[] }) {
       </Card>
 
       <InvoiceFormModal open={modalOpen} onOpenChange={setModalOpen} editing={editing} onSaved={onSaved} />
+      <MarkPaidModal open={payModalOpen} onOpenChange={setPayModalOpen} invoice={payingInvoice} onPaid={onPaid} />
     </div>
   );
 }

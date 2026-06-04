@@ -212,7 +212,7 @@ export async function sendInvoiceByEmail(id: string): Promise<{ ok: true }> {
  *   - createReceipt() inserts the income Transaction (single source of truth)
  *   - Then we flip the invoice status to 'paid'
  */
-export async function markInvoicePaid(id: string, paymentMethod: string = "Bank Transfer"): Promise<{ ok: true; receipt_id: string }> {
+export async function markInvoicePaid(id: string, paymentMethod: string = "Bank Transfer"): Promise<{ ok: true; receipt_id: string; transaction_id: string | null; customer_name: string; date: string }> {
   const supabase = await createClient();
   const { data: invoice, error } = await supabase.from("invoices").select("*").eq("id", id).single();
   if (error) throw new Error(error.message);
@@ -238,9 +238,18 @@ export async function markInvoicePaid(id: string, paymentMethod: string = "Bank 
   // Flip invoice status
   await supabase.from("invoices").update({ status: "paid" }).eq("id", id);
 
+  // The cascade inserts an income transaction tagged with linked_doc_id =
+  // receipt.id. Return its id so the UI can attach the customer's payment
+  // proof (if they sent one) to that transaction's receipt_url.
+  const { data: txRow } = await supabase
+    .from("transactions")
+    .select("id")
+    .eq("linked_doc_id", receipt.id)
+    .maybeSingle();
+
   revalidatePath("/invoices");
   revalidatePath("/receipts");
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
-  return { ok: true, receipt_id: receipt.id };
+  return { ok: true, receipt_id: receipt.id, transaction_id: txRow?.id ?? null, customer_name: inv.customer_name, date: today };
 }
