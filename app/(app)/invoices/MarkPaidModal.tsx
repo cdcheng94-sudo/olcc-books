@@ -5,9 +5,10 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLang } from "@/components/LangProvider";
-import { fmtMoney } from "@/lib/format";
+import { fmtMoney, todayIso } from "@/lib/format";
 import { PAYMENT_METHODS } from "@/lib/categories";
 import { uploadReceiptToDrive } from "@/lib/upload-receipt";
 import type { InvoiceRow } from "@/lib/types";
@@ -29,19 +30,20 @@ type Props = {
 export function MarkPaidModal({ open, onOpenChange, invoice, onPaid }: Props) {
   const { t } = useLang();
   const [method, setMethod] = useState<string>("Bank Transfer");
+  const [paidDate, setPaidDate] = useState<string>(todayIso());
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
-    if (open) { setMethod("Bank Transfer"); setFile(null); setUploading(false); }
+    if (open) { setMethod("Bank Transfer"); setPaidDate(todayIso()); setFile(null); setUploading(false); }
   }, [open]);
 
   function confirm() {
     if (!invoice) return;
     startTransition(async () => {
       try {
-        const res = await markInvoicePaid(invoice.id, method);
+        const res = await markInvoicePaid(invoice.id, method, paidDate);
         // Attach the customer's payment proof (if any) to the income transaction.
         if (file && res.transaction_id) {
           setUploading(true);
@@ -82,6 +84,12 @@ export function MarkPaidModal({ open, onOpenChange, invoice, onPaid }: Props) {
             <div className="flex items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-sm">
               <span className="font-mono font-medium">{invoice.invoice_number}</span>
               <span className="tabular-nums font-semibold text-success">{fmtMoney(invoice.total)}</span>
+            </div>
+
+            {/* payment date */}
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs">{t.invoice.markPaidDate}</Label>
+              <Input type="date" value={paidDate} onChange={(e) => setPaidDate(e.target.value)} max={todayIso()} />
             </div>
 
             {/* payment method */}

@@ -212,7 +212,7 @@ export async function sendInvoiceByEmail(id: string): Promise<{ ok: true }> {
  *   - createReceipt() inserts the income Transaction (single source of truth)
  *   - Then we flip the invoice status to 'paid'
  */
-export async function markInvoicePaid(id: string, paymentMethod: string = "Bank Transfer"): Promise<{ ok: true; receipt_id: string; transaction_id: string | null; customer_name: string; date: string }> {
+export async function markInvoicePaid(id: string, paymentMethod: string = "Bank Transfer", paidDate?: string): Promise<{ ok: true; receipt_id: string; transaction_id: string | null; customer_name: string; date: string }> {
   const supabase = await createClient();
   const { data: invoice, error } = await supabase.from("invoices").select("*").eq("id", id).single();
   if (error) throw new Error(error.message);
@@ -220,11 +220,16 @@ export async function markInvoicePaid(id: string, paymentMethod: string = "Bank 
 
   if (inv.status === "paid") throw new Error("Invoice is already paid.");
 
+  // Payment date defaults to today, but the caller can pass the actual date
+  // the customer paid (so the receipt + income transaction are dated right).
+  const date = (paidDate && /^\d{4}-\d{2}-\d{2}$/.test(paidDate))
+    ? paidDate
+    : new Date().toISOString().slice(0, 10);
+
   // Cascade through receipt creation (carry over discount% + tax so the
   // receipt shows the same breakdown as the invoice the customer paid)
-  const today = new Date().toISOString().slice(0, 10);
   const receipt = await createReceipt({
-    date:              today,
+    date,
     customer_name:     inv.customer_name,
     customer_email:    inv.customer_email   || undefined,
     customer_address:  inv.customer_address || undefined,
@@ -251,5 +256,5 @@ export async function markInvoicePaid(id: string, paymentMethod: string = "Bank 
   revalidatePath("/receipts");
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
-  return { ok: true, receipt_id: receipt.id, transaction_id: txRow?.id ?? null, customer_name: inv.customer_name, date: today };
+  return { ok: true, receipt_id: receipt.id, transaction_id: txRow?.id ?? null, customer_name: inv.customer_name, date };
 }
