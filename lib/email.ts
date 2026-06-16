@@ -7,11 +7,15 @@
  * Env vars consumed:
  *   RESEND_API_KEY   — auth
  *   RESEND_FROM      — "Display Name <addr@domain>" or just an address
+ *   RESEND_REPLY_TO  — where customer replies land (we send from a noreply
+ *                      subdomain, so replies need to be redirected to a real
+ *                      inbox). Defaults to the company Gmail.
  */
 
 import { Resend } from "resend";
 
 const FROM = process.env.RESEND_FROM || "OLCC Books <onboarding@resend.dev>";
+const REPLY_TO = process.env.RESEND_REPLY_TO || "olcctechnology@gmail.com";
 
 function client() {
   const key = process.env.RESEND_API_KEY;
@@ -39,6 +43,7 @@ export async function sendInvoiceEmail(opts: {
 
   const { data, error } = await resend.emails.send({
     from: FROM,
+    replyTo: REPLY_TO,
     to:   opts.to,
     subject: `Invoice ${opts.invoiceNumber} from OLCC Technology`,
     text: [
@@ -71,6 +76,7 @@ export async function sendReceiptEmail(opts: {
 
   const { data, error } = await resend.emails.send({
     from: FROM,
+    replyTo: REPLY_TO,
     to:   opts.to,
     subject: `Receipt ${opts.receiptNumber} — payment received`,
     text: [
@@ -115,6 +121,7 @@ export async function sendSubscriptionReminder(opts: {
 
   const { data, error } = await resend.emails.send({
     from: FROM,
+    replyTo: REPLY_TO,
     to:   opts.to,
     subject: `Reminder: ${opts.service} — ${opts.daysLabel}`,
     text: [
