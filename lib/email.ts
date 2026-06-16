@@ -15,7 +15,7 @@
 import { Resend } from "resend";
 
 const FROM = process.env.RESEND_FROM || "OLCC Books <onboarding@resend.dev>";
-const REPLY_TO = process.env.RESEND_REPLY_TO || "olcctechnology@gmail.com";
+const REPLY_TO = process.env.RESEND_REPLY_TO || "developer@olcctechnology.com";
 
 function client() {
   const key = process.env.RESEND_API_KEY;
