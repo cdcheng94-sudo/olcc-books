@@ -46,6 +46,28 @@ export function localizedDaysLabel(days: number, dict: { daysLabel: { overdueSuf
   return `${dict.daysLabel.dueInPrefix}${days}${dict.daysLabel.dueInSuffix}`;
 }
 
+/**
+ * Reminder milestones (days before the charge) at which we email — instead
+ * of emailing every day inside the window. We use the subscription's own
+ * `remindDaysBefore` as the first milestone, then 3 days before, then the
+ * day itself. Deduped, only values within [0, remindDaysBefore].
+ *
+ *   remindDaysBefore 7  → [7, 3, 0]
+ *   remindDaysBefore 14 → [14, 3, 0]
+ *   remindDaysBefore 3  → [3, 0]
+ *   remindDaysBefore 0  → [0]
+ */
+export function reminderMilestones(remindDaysBefore: number): number[] {
+  const base = [remindDaysBefore, 3, 0];
+  const within = base.filter((d) => d >= 0 && d <= remindDaysBefore);
+  return [...new Set(within)].sort((a, b) => b - a);
+}
+
+/** True only on a milestone day → at most one email per milestone, no spam. */
+export function shouldRemindToday(days: number, remindDaysBefore: number): boolean {
+  return reminderMilestones(remindDaysBefore).includes(days);
+}
+
 /** Push a date forward by the given frequency, returning a fresh ISO date. */
 export function advanceDate(isoDate: string, freq: Frequency): string {
   const d = new Date(isoDate + "T00:00:00");

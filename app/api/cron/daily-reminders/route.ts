@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { fmtMoney } from "@/lib/format";
-import { daysUntilDue, daysLabel } from "@/lib/recurring-utils";
+import { daysUntilDue, daysLabel, shouldRemindToday } from "@/lib/recurring-utils";
 import { getSettings } from "@/lib/queries/settings";
 import { sendSubscriptionReminder, sendRecurringDigest } from "@/lib/email";
 import type { RecurringRow, SubscriptionRow } from "@/lib/types";
@@ -62,7 +62,9 @@ export async function GET(request: Request) {
   for (const s of (subs || []) as SubscriptionRow[]) {
     if (!s.customer_email) continue;
     const days = daysUntilDue(s.next_charge_date);
-    if (days > s.remind_days_before) continue;     // not yet in reminder window
+    // Only email on fixed milestones (e.g. 7 / 3 / 0 days before) so the
+    // customer gets a handful of reminders, not one every single day.
+    if (!shouldRemindToday(days, s.remind_days_before)) continue;
 
     try {
       await sendSubscriptionReminder({
