@@ -134,6 +134,9 @@ export type RecurringRow = {
 // ---------- subscriptions (customers pay us — new in v2) ----------
 export type SubscriptionStatus = "active" | "paused";
 
+export type CustomerHealth = "healthy" | "watch" | "at_risk";
+export type CheckInChannel = "call" | "whatsapp" | "visit" | "email" | "other";
+
 export type SubscriptionRow = {
   id: UUID;
   customer_name: string;
@@ -147,6 +150,22 @@ export type SubscriptionRow = {
   remind_days_before: number;
   status: SubscriptionStatus;
   last_charged_date: ISODate | null;
+  created_at: ISODateTime;
+  // customer-care fields (migration 0010)
+  next_checkin_date: ISODate | null;
+  checkin_interval_days: number;
+  health: CustomerHealth;
+};
+
+// ---------- check_ins (customer-care log) ----------
+export type CheckInRow = {
+  id: UUID;
+  subscription_id: UUID;
+  date: ISODate;
+  channel: CheckInChannel | null;
+  health: CustomerHealth | null;
+  feedback: string | null;
+  created_by: string | null;
   created_at: ISODateTime;
 };
 

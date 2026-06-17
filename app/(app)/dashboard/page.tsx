@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getMonthlySummary } from "@/lib/queries/transactions";
 import { recurringDashboard } from "@/lib/queries/recurring";
 import { subscriptionsDashboard } from "@/lib/queries/subscriptions";
+import { careDashboard } from "@/lib/queries/care";
 import { getFundPools } from "@/lib/queries/capital";
 import {
   getMonthlyTrend,
@@ -17,10 +18,11 @@ import { DashboardClient } from "./DashboardClient";
  */
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const [summary, toPay, toCollect, trend, byCategory, recent, pools] = await Promise.all([
+  const [summary, toPay, toCollect, careDue, trend, byCategory, recent, pools] = await Promise.all([
     getMonthlySummary(supabase),
     recurringDashboard(supabase),
     subscriptionsDashboard(supabase),
+    careDashboard(supabase),
     getMonthlyTrend(supabase, 6),
     getCategoryBreakdown(supabase),
     getRecentTransactions(supabase, 8),
@@ -31,6 +33,7 @@ export default async function DashboardPage() {
       summary={summary}
       toPay={toPay}
       toCollect={toCollect}
+      careDue={careDue}
       trend={trend}
       byCategory={byCategory}
       recent={recent}

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { advanceDate, FREQUENCIES, type Frequency } from "@/lib/recurring-utils";
+import { advanceDate, addDays, FREQUENCIES, type Frequency } from "@/lib/recurring-utils";
 import { todayIso } from "@/lib/format";
 import { createReceipt } from "../receipts/actions";
 import type { SubscriptionRow } from "@/lib/types";
@@ -60,6 +60,8 @@ export async function createSubscription(input: SubscriptionInput) {
     next_charge_date: c.next_charge_date,
     remind_days_before: c.remind_days_before,
     status: c.status,
+    // first after-sales check-in falls due a week after signup
+    next_checkin_date: addDays(todayIso(), 7),
   }).select().single();
   if (error) throw new Error(error.message);
   revalidatePath("/subscriptions");

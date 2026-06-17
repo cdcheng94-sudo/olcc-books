@@ -112,3 +112,8 @@ export const PAYMENT_METHODS = [
   "Other",
 ] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+// ---- Customer-care (客户关怀) constants ----
+export const CHECKIN_CHANNELS  = ["call", "whatsapp", "visit", "email", "other"] as const;
+export const CHECKIN_HEALTHS   = ["healthy", "watch", "at_risk"] as const;
+export const CHECKIN_INTERVALS = [7, 14, 30, 90] as const;

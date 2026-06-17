@@ -68,6 +68,16 @@ export function shouldRemindToday(days: number, remindDaysBefore: number): boole
   return reminderMilestones(remindDaysBefore).includes(days);
 }
 
+/** Add N days to an ISO date, returning a fresh ISO date. */
+export function addDays(isoDate: string, n: number): string {
+  const d = new Date(isoDate + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  const y = d.getFullYear();
+  const m = d.getMonth() + 1;
+  const day = d.getDate();
+  return `${y}-${m < 10 ? "0" + m : m}-${day < 10 ? "0" + day : day}`;
+}
+
 /** Push a date forward by the given frequency, returning a fresh ISO date. */
 export function advanceDate(isoDate: string, freq: Frequency): string {
   const d = new Date(isoDate + "T00:00:00");
