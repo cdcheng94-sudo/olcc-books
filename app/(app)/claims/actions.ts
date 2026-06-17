@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { CLAIM_CATEGORIES } from "@/lib/categories";
+import { CLAIM_CATEGORIES, CAPITAL_CATEGORIES } from "@/lib/categories";
 import { deleteLinkedDriveFiles } from "@/lib/drive-cleanup";
 import type { ClaimRow, ClaimStatus } from "@/lib/types";
 
@@ -116,11 +116,14 @@ export async function approveClaim(id: string) {
 }
 
 /**
- * Mark an approved claim paid → cascade expense Transaction.
- *   - category is always "Other Expense" (claim category lives in the note)
+ * Mark an approved claim paid → cascade an expense Transaction.
+ *   - By default the cascade is an operating "expense" (Operating Pool).
+ *   - Pass { capital: true } when the reimbursement was a capital purchase
+ *     (employee bought equipment etc.) → cascades a "capital_expense"
+ *     (Capital Pool) under the chosen capital category.
  *   - linked_doc_id back-references the claim
  */
-export async function markClaimPaid(id: string) {
+export async function markClaimPaid(id: string, opts?: { capital?: boolean; capitalCategory?: string }) {
   const supabase = await createClient();
   const { data: claim, error: getErr } = await supabase.from("claims").select("*").eq("id", id).single();
   if (getErr) throw new Error(getErr.message);
@@ -129,11 +132,15 @@ export async function markClaimPaid(id: string) {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // 1. Cascade transaction
+  const isCapital = !!opts?.capital;
+  const capCat = opts?.capitalCategory && (CAPITAL_CATEGORIES as readonly string[]).includes(opts.capitalCategory)
+    ? opts.capitalCategory : "other";
+
+  // 1. Cascade transaction — operating expense (default) or capital expense.
   const { error: txErr } = await supabase.from("transactions").insert({
     date:          today,
-    type:          "expense",
-    category:      "Other Expense",
+    type:          isCapital ? "capital_expense" : "expense",
+    category:      isCapital ? capCat : "Other Expense",
     amount:        c.amount,
     party:         c.claimant,
     note:          `Claim: ${c.item_desc} (${c.category})`,
@@ -146,6 +153,7 @@ export async function markClaimPaid(id: string) {
 
   revalidatePath("/claims");
   revalidatePath("/transactions");
+  revalidatePath("/capital");
   revalidatePath("/dashboard");
   return { ok: true };
 }

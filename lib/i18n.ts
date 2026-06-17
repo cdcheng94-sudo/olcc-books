@@ -466,6 +466,11 @@ export const T = {
       confirmDeletePaid:"删除报销「{item}」?关联的支出交易也会被一起删除,此操作无法撤销。",
       confirmApprove:  "批准 {claimant} 的报销 {amount}?",
       confirmMarkPaid: "把这笔报销标记已领?{amount} 将记为支出。",
+      markPaidTitle:   "标记已领",
+      markPaidCapital: "这笔是资本性支出",
+      markPaidCapitalHint:"勾选后从「资本池」扣(当固定资产/资本开销),不勾则算营运支出。一般报销不用勾。",
+      markPaidCapitalCategory:"资本分类",
+      markPaidConfirm: "确认已领",
     },
     eduflow: {
       title:           "新增 EduFlow 客户",
@@ -1033,6 +1038,11 @@ export const T = {
       confirmDeletePaid:"Delete claim \"{item}\"? Its linked expense transaction will also be removed. This cannot be undone.",
       confirmApprove:  "Approve {claimant}'s claim for {amount}?",
       confirmMarkPaid: "Mark this claim paid? {amount} will be recorded as an expense.",
+      markPaidTitle:   "Mark as paid",
+      markPaidCapital: "This is a capital expense",
+      markPaidCapitalHint:"Deducts from the Capital Pool (a fixed-asset / capital purchase) instead of an operating expense. Most reimbursements don't need this.",
+      markPaidCapitalCategory:"Capital category",
+      markPaidConfirm: "Confirm paid",
     },
     eduflow: {
       title:           "New EduFlow Customer",

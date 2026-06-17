@@ -9,8 +9,9 @@ import { interp } from "@/lib/i18n";
 import { fmtDate, fmtMoney } from "@/lib/format";
 import { uploadReceiptToDrive } from "@/lib/upload-receipt";
 import type { ClaimRow, ClaimStatus } from "@/lib/types";
-import { deleteClaim, approveClaim, markClaimPaid } from "./actions";
+import { deleteClaim, approveClaim } from "./actions";
 import { ClaimFormModal } from "./ClaimFormModal";
+import { MarkClaimPaidModal } from "./MarkClaimPaidModal";
 
 type Filter = ClaimStatus | "all";
 
@@ -26,6 +27,8 @@ export function ClaimsClient({ initialRows }: { initialRows: ClaimRow[] }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [editing, setEditing] = useState<ClaimRow | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [payingClaim, setPayingClaim] = useState<ClaimRow | null>(null);
+  const [payModalOpen, setPayModalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const reuploadRef = useRef<HTMLInputElement>(null);
@@ -91,14 +94,13 @@ export function ClaimsClient({ initialRows }: { initialRows: ClaimRow[] }) {
   }
 
   function onMarkPaid(row: ClaimRow) {
-    if (!confirm(interp(t.claims.confirmMarkPaid, { amount: fmtMoney(row.amount) }))) return;
-    startTransition(async () => {
-      try {
-        await markClaimPaid(row.id);
-        const today = new Date().toISOString().slice(0, 10);
-        setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, status: "paid", paid_date: today } : r));
-      } catch (e) { alert(t.errors.markPaidFailed + (e as Error).message); }
-    });
+    setPayingClaim(row);
+    setPayModalOpen(true);
+  }
+
+  function onPaid(claimId: string) {
+    const today = new Date().toISOString().slice(0, 10);
+    setRows((prev) => prev.map((r) => r.id === claimId ? { ...r, status: "paid", paid_date: today } : r));
   }
 
   // 补传 — attach a receipt to an existing claim with no file yet.
@@ -236,6 +238,7 @@ export function ClaimsClient({ initialRows }: { initialRows: ClaimRow[] }) {
       <input ref={reuploadRef} type="file" accept="image/*,application/pdf" capture="environment" onChange={onReuploadFile} className="hidden" />
 
       <ClaimFormModal open={modalOpen} onOpenChange={setModalOpen} editing={editing} onSaved={onSaved} />
+      <MarkClaimPaidModal open={payModalOpen} onOpenChange={setPayModalOpen} claim={payingClaim} onPaid={onPaid} />
     </div>
   );
 }
