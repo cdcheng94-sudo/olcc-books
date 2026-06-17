@@ -58,6 +58,131 @@ export function DashboardClient({ summary, toPay, toCollect, careDue, trend, byC
         <div className="text-sm text-muted-foreground">{t.common.greeting} 👋</div>
       </div>
 
+      {/* Needs attention — three equal reminder columns, up top */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
+        {/* To Collect (customers owe us) */}
+        <Card className="h-full">
+          <CardHeader className="flex-row items-center gap-2 space-y-0">
+            <AlertCircle size={18} className="text-gold" />
+            <CardTitle className="text-sm font-bold">{t.dashboard.toCollect}</CardTitle>
+            {toCollectUrgent > 0 && (
+              <span className="ml-auto bg-danger-soft text-danger px-2 py-0.5 rounded-full text-[10px] font-bold">
+                {toCollectUrgent} {t.dashboard.urgent}
+              </span>
+            )}
+          </CardHeader>
+          <CardContent className="pt-0">
+            {toCollect.length === 0 ? (
+              <Link href="/subscriptions" className="text-xs text-muted-foreground italic hover:text-navy underline">
+                {t.dashboard.emptySub}
+              </Link>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {toCollect.map((s) => {
+                  const u = urgencyClasses(s.urgency);
+                  return (
+                    <div key={s.id} className="flex bg-card border border-border rounded-md overflow-hidden shadow-sm">
+                      <div className={`w-1.5 ${u.bar}`} />
+                      <div className="flex-1 px-3 py-2.5 flex justify-between items-center">
+                        <div className="min-w-0">
+                          <div className="font-semibold text-sm truncate">{s.customer_name}</div>
+                          <div className="text-xs text-muted-foreground truncate">{s.service_desc}</div>
+                        </div>
+                        <div className="text-right shrink-0 ml-3">
+                          <div className="font-bold text-sm tabular-nums">{fmtMoney(+(s.amount * (1 - (s.discount_percent || 0) / 100)).toFixed(2))}</div>
+                          <div className={`text-[11px] font-semibold ${u.text}`}>{localizedDaysLabel(s.days_until_due, t)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* To Pay (we owe vendors) */}
+        <Card className="h-full">
+          <CardHeader className="flex-row items-center gap-2 space-y-0">
+            <Clock size={18} className="text-gold" />
+            <CardTitle className="text-sm font-bold">{t.dashboard.toPay}</CardTitle>
+            {toPayUrgent > 0 && (
+              <span className="ml-auto bg-danger-soft text-danger px-2 py-0.5 rounded-full text-[10px] font-bold">
+                {toPayUrgent} {t.dashboard.urgent}
+              </span>
+            )}
+          </CardHeader>
+          <CardContent className="pt-0">
+            {toPay.length === 0 ? (
+              <Link href="/recurring" className="text-xs text-muted-foreground italic hover:text-navy underline">
+                {t.dashboard.emptyRec}
+              </Link>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {toPay.map((r) => {
+                  const u = urgencyClasses(r.urgency);
+                  return (
+                    <div key={r.id} className="flex bg-card border border-border rounded-md overflow-hidden shadow-sm">
+                      <div className={`w-1.5 ${u.bar}`} />
+                      <div className="flex-1 px-3 py-2.5 flex justify-between items-center">
+                        <div className="min-w-0">
+                          <div className="font-semibold text-sm truncate">{r.name}</div>
+                          <div className="text-xs text-muted-foreground truncate">{r.payee || fmtDate(r.next_due_date)}</div>
+                        </div>
+                        <div className="text-right shrink-0 ml-3">
+                          <div className="font-bold text-sm tabular-nums">{fmtMoney(r.amount)}</div>
+                          <div className={`text-[11px] font-semibold ${u.text}`}>{localizedDaysLabel(r.days_until_due, t)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Customers to check in (after-sales care) */}
+        <Card className="h-full">
+          <CardHeader className="flex-row items-center gap-2 space-y-0">
+            <HeartHandshake size={18} className="text-gold" />
+            <CardTitle className="text-sm font-bold">{t.dashboard.careTitle}</CardTitle>
+            {careDue.length > 0 && (
+              <span className="ml-auto bg-danger-soft text-danger px-2 py-0.5 rounded-full text-[10px] font-bold">
+                {careDue.length}
+              </span>
+            )}
+          </CardHeader>
+          <CardContent className="pt-0">
+            {careDue.length === 0 ? (
+              <Link href="/care" className="text-xs text-muted-foreground italic hover:text-navy underline">
+                {t.dashboard.careEmpty}
+              </Link>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {careDue.map((c) => {
+                  const u = c.checkin_urgency ? urgencyClasses(c.checkin_urgency) : null;
+                  return (
+                    <Link key={c.id} href="/care" className="flex bg-card border border-border rounded-md overflow-hidden shadow-sm hover:border-gold">
+                      <div className={`w-1.5 ${u ? u.bar : "bg-warning"}`} />
+                      <div className="flex-1 px-3 py-2.5 flex justify-between items-center min-w-0">
+                        <div className="min-w-0">
+                          <div className="font-semibold text-sm truncate">{c.customer_name}</div>
+                          <div className="text-xs text-muted-foreground truncate">{c.service_desc}</div>
+                        </div>
+                        <div className={`text-[11px] font-semibold shrink-0 ml-3 ${u ? u.text : "text-warning"}`}>
+                          {c.days_until_checkin != null ? localizedDaysLabel(c.days_until_checkin, t) : ""}
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Fund pools — Capital vs Operating */}
       <Card className="mb-6">
         <CardHeader className="flex-row items-center gap-2 space-y-0 pb-3">
@@ -138,131 +263,6 @@ export function DashboardClient({ summary, toPay, toCollect, careDue, trend, byC
         </Card>
       </div>
 
-      {/* To Collect + To Pay reminder lists */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <Card>
-          <CardHeader className="flex-row items-center gap-2 space-y-0">
-            <AlertCircle size={18} className="text-gold" />
-            <CardTitle className="text-sm font-bold">{t.dashboard.toCollect}</CardTitle>
-            {toCollectUrgent > 0 && (
-              <span className="ml-auto bg-danger-soft text-danger px-2 py-0.5 rounded-full text-[10px] font-bold">
-                {toCollectUrgent} {t.dashboard.urgent}
-              </span>
-            )}
-          </CardHeader>
-          <CardContent className="pt-0">
-            {toCollect.length === 0 ? (
-              <Link href="/subscriptions" className="text-xs text-muted-foreground italic hover:text-navy underline">
-                {t.dashboard.emptySub}
-              </Link>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {toCollect.map((s) => {
-                  const u = urgencyClasses(s.urgency);
-                  return (
-                    <div key={s.id} className="flex bg-card border border-border rounded-md overflow-hidden shadow-sm">
-                      <div className={`w-1.5 ${u.bar}`} />
-                      <div className="flex-1 px-3 py-2.5 flex justify-between items-center">
-                        <div className="min-w-0">
-                          <div className="font-semibold text-sm truncate">{s.customer_name}</div>
-                          <div className="text-xs text-muted-foreground truncate">{s.service_desc}</div>
-                        </div>
-                        <div className="text-right shrink-0 ml-3">
-                          <div className="font-bold text-sm tabular-nums">{fmtMoney(+(s.amount * (1 - (s.discount_percent || 0) / 100)).toFixed(2))}</div>
-                          <div className={`text-[11px] font-semibold ${u.text}`}>{localizedDaysLabel(s.days_until_due, t)}</div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex-row items-center gap-2 space-y-0">
-            <Clock size={18} className="text-gold" />
-            <CardTitle className="text-sm font-bold">{t.dashboard.toPay}</CardTitle>
-            {toPayUrgent > 0 && (
-              <span className="ml-auto bg-danger-soft text-danger px-2 py-0.5 rounded-full text-[10px] font-bold">
-                {toPayUrgent} {t.dashboard.urgent}
-              </span>
-            )}
-          </CardHeader>
-          <CardContent className="pt-0">
-            {toPay.length === 0 ? (
-              <Link href="/recurring" className="text-xs text-muted-foreground italic hover:text-navy underline">
-                {t.dashboard.emptyRec}
-              </Link>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {toPay.map((r) => {
-                  const u = urgencyClasses(r.urgency);
-                  return (
-                    <div key={r.id} className="flex bg-card border border-border rounded-md overflow-hidden shadow-sm">
-                      <div className={`w-1.5 ${u.bar}`} />
-                      <div className="flex-1 px-3 py-2.5 flex justify-between items-center">
-                        <div className="min-w-0">
-                          <div className="font-semibold text-sm truncate">{r.name}</div>
-                          <div className="text-xs text-muted-foreground truncate">{r.payee || fmtDate(r.next_due_date)}</div>
-                        </div>
-                        <div className="text-right shrink-0 ml-3">
-                          <div className="font-bold text-sm tabular-nums">{fmtMoney(r.amount)}</div>
-                          <div className={`text-[11px] font-semibold ${u.text}`}>{localizedDaysLabel(r.days_until_due, t)}</div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Customers due for a check-in (after-sales care) */}
-      <Card className="mt-5">
-        <CardHeader className="flex-row items-center gap-2 space-y-0">
-          <HeartHandshake size={18} className="text-gold" />
-          <CardTitle className="text-sm font-bold">{t.dashboard.careTitle}</CardTitle>
-          {careDue.length > 0 && (
-            <span className="ml-auto bg-danger-soft text-danger px-2 py-0.5 rounded-full text-[10px] font-bold">
-              {careDue.length}
-            </span>
-          )}
-          <Link href="/care" className={`text-[11px] text-muted-foreground hover:text-navy flex items-center gap-0.5 font-medium ${careDue.length > 0 ? "" : "ml-auto"}`}>
-            {t.dashboard.viewAll}<ArrowRight size={12} />
-          </Link>
-        </CardHeader>
-        <CardContent className="pt-0">
-          {careDue.length === 0 ? (
-            <Link href="/care" className="text-xs text-muted-foreground italic hover:text-navy underline">
-              {t.dashboard.careEmpty}
-            </Link>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {careDue.map((c) => {
-                const u = c.checkin_urgency ? urgencyClasses(c.checkin_urgency) : null;
-                return (
-                  <Link key={c.id} href="/care" className="flex bg-card border border-border rounded-md overflow-hidden shadow-sm hover:border-gold">
-                    <div className={`w-1.5 ${u ? u.bar : "bg-warning"}`} />
-                    <div className="flex-1 px-3 py-2.5 flex justify-between items-center min-w-0">
-                      <div className="min-w-0">
-                        <div className="font-semibold text-sm truncate">{c.customer_name}</div>
-                        <div className="text-xs text-muted-foreground truncate">{c.service_desc}</div>
-                      </div>
-                      <div className={`text-[11px] font-semibold shrink-0 ml-3 ${u ? u.text : "text-warning"}`}>
-                        {c.days_until_checkin != null ? localizedDaysLabel(c.days_until_checkin, t) : ""}
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }
