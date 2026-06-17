@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { CLAIM_CATEGORIES } from "@/lib/categories";
+import { deleteLinkedDriveFiles } from "@/lib/drive-cleanup";
 import type { ClaimRow, ClaimStatus } from "@/lib/types";
 
 /**
@@ -80,6 +81,7 @@ export async function updateClaim(id: string, input: ClaimInput): Promise<ClaimR
 
 export async function deleteClaim(id: string) {
   const supabase = await createClient();
+  await deleteLinkedDriveFiles(supabase, "claims", id);   // best-effort Drive cleanup
   // If a transaction was cascaded (paid claim), remove that too.
   await supabase.from("transactions").delete().eq("linked_doc_id", id);
   const { error } = await supabase.from("claims").delete().eq("id", id);

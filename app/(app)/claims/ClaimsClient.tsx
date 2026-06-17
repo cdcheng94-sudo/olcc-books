@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition, useMemo } from "react";
-import { Plus, CheckCircle2, CircleCheck, Pencil, Trash2, ExternalLink } from "lucide-react";
+import { useState, useTransition, useMemo, useRef } from "react";
+import { Plus, CheckCircle2, CircleCheck, Pencil, Trash2, ExternalLink, Upload, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useLang } from "@/components/LangProvider";
 import { interp } from "@/lib/i18n";
 import { fmtDate, fmtMoney } from "@/lib/format";
+import { uploadReceiptToDrive } from "@/lib/upload-receipt";
 import type { ClaimRow, ClaimStatus } from "@/lib/types";
 import { deleteClaim, approveClaim, markClaimPaid } from "./actions";
 import { ClaimFormModal } from "./ClaimFormModal";
@@ -26,6 +27,9 @@ export function ClaimsClient({ initialRows }: { initialRows: ClaimRow[] }) {
   const [editing, setEditing] = useState<ClaimRow | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const reuploadRef = useRef<HTMLInputElement>(null);
+  const reuploadRowRef = useRef<ClaimRow | null>(null);
 
   const visibleRows = useMemo(
     () => (filter === "all" ? rows : rows.filter((r) => r.status === filter)),
@@ -97,6 +101,41 @@ export function ClaimsClient({ initialRows }: { initialRows: ClaimRow[] }) {
     });
   }
 
+  // 补传 — attach a receipt to an existing claim with no file yet.
+  function pickReupload(row: ClaimRow) {
+    reuploadRowRef.current = row;
+    reuploadRef.current?.click();
+  }
+  async function onReuploadFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    const row = reuploadRowRef.current;
+    reuploadRowRef.current = null;
+    if (!f || !row) return;
+    setUploadingId(row.id);
+    try {
+      const res = await uploadReceiptToDrive({
+        file: f,
+        category: "Claims",
+        linkedTable: "claims",
+        linkedId: row.id,
+        dateIso: row.date,
+        party: row.claimant || null,
+        docType: "claim",
+      });
+      if (res.ok) {
+        setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, receipt_url: res.webViewLink } : r)));
+      } else {
+        const k = res.kind;
+        alert(k === "auth" ? t.tx.driveAuthErr : k === "quota" ? t.tx.driveQuotaErr : t.tx.driveUploadErr);
+      }
+    } catch (err) {
+      alert(t.tx.driveUploadErr + " " + (err as Error).message);
+    } finally {
+      setUploadingId(null);
+    }
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
@@ -144,10 +183,20 @@ export function ClaimsClient({ initialRows }: { initialRows: ClaimRow[] }) {
                 <td className="px-4 py-3 font-medium">{r.claimant}</td>
                 <td className="px-4 py-3">
                   <div>{r.item_desc}</div>
-                  {r.receipt_url && (
-                    <a href={r.receipt_url} target="_blank" rel="noreferrer" className="text-[11px] text-muted-foreground hover:text-navy underline inline-flex items-center gap-0.5">
+                  {r.receipt_url ? (
+                    <a href={r.receipt_url} target="_blank" rel="noreferrer" title={t.tx.openInDrive}
+                      className="text-[11px] text-muted-foreground hover:text-navy underline inline-flex items-center gap-0.5">
                       {t.claims.receiptLink} <ExternalLink className="w-2.5 h-2.5" />
                     </a>
+                  ) : uploadingId === r.id ? (
+                    <span className="text-[11px] text-muted-foreground inline-flex items-center gap-0.5">
+                      <Loader2 className="w-2.5 h-2.5 animate-spin" />{t.tx.uploadingReceipt}
+                    </span>
+                  ) : (
+                    <button type="button" onClick={() => pickReupload(r)} title={t.tx.uploadReceipt}
+                      className="text-[11px] text-muted-foreground hover:text-navy inline-flex items-center gap-0.5">
+                      <Upload className="w-2.5 h-2.5" />{t.tx.uploadReceipt}
+                    </button>
                   )}
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">{r.category}</td>
@@ -182,6 +231,9 @@ export function ClaimsClient({ initialRows }: { initialRows: ClaimRow[] }) {
           </tbody>
         </table>
       </Card>
+
+      {/* hidden input for 补传 (supplemental receipt upload) */}
+      <input ref={reuploadRef} type="file" accept="image/*,application/pdf" capture="environment" onChange={onReuploadFile} className="hidden" />
 
       <ClaimFormModal open={modalOpen} onOpenChange={setModalOpen} editing={editing} onSaved={onSaved} />
     </div>
