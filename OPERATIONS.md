@@ -59,11 +59,13 @@
 
 ### 客户转账后怎么入账
 
-`/invoices` → 那行 → 点 ✓ (Mark Paid)
-- 弹出问 Payment method(默认 Bank Transfer)→ 按 OK
-- 自动级联做这 3 件事:
+`/invoices` → 那行 → 点 ✓ (Mark Paid) → **弹出对话框:**
+- **Payment method**(默认 Bank Transfer)
+- **收款日期**:默认今天,可改成客户实际转账那天(收据 + 收入会按这个日期记)
+- **客户付款凭证(选填)**:客户发来的转账截图可以选文件上传 → 存进 Google Drive,挂到那笔收入交易上
+- 点「确认已付」,自动级联:
   - Invoice 状态变 **Paid** ✓
-  - `/receipts` 自动多一张 **RCP-XXXX** 
+  - `/receipts` 自动多一张 **RCP-XXXX**
   - `/transactions` 自动多一笔 income MYR XXX
   - Dashboard 数字立刻更新
 
@@ -93,6 +95,14 @@
 ### 用 OCR 拍收据(可选,加速)
 
 `/transactions` → **金边按钮 "Scan receipt"** → 选/拍一张收据照片 → 等 5-10 秒 → 表单自动填好 → 检查改一下 → Save
+
+### 📎 收据现在存 Google Drive(自动归档)
+
+- 在交易表单里**选一张收据图/PDF** → 保存时自动压缩后传到公司 **Google Drive**(`OLCC Books/年份/Receipts`)。
+- 那一行的「凭证」列会出现 **查看** 链接,点开直接跳 Drive。
+- 之前没传的行 → 显示 **补传凭证** 按钮,随时补。
+- 删交易会**连带删掉 Drive 上的凭证**(确认框会提示)。
+- 就算 Drive 临时故障,交易照样保存成功,只提示「可稍后补传」,不会卡住记账。
 
 ### 错记了想改
 
@@ -165,13 +175,39 @@ Dashboard "To Collect" 卡片,从上往下按到期紧急度排序。
 
 ---
 
+## 4b. Customer Care(客户关怀 / 售后)
+
+> 目的:主动关心 EduFlow 客户,确保用得顺、降低流失。客户通常不会主动反映问题,这个页提醒**我们自己**去跟进。
+
+### 看谁该关心了
+
+`/care`(左侧栏「客户关怀」)→ 列出所有活跃订阅客户,按「下次关怀」紧急度排序:
+- **健康度徽章:** 健康 / 留意 / 有风险
+- **上次关怀 / 下次关怀**(还剩几天,逾期标红)
+- 付款逾期的客户会另标一个小红标
+
+新订阅开通后,系统自动排「7 天后首次关怀」。到期/逾期的客户也会出现在 **Dashboard 顶部「Customers to check in」** 卡。
+
+### 关心完一个客户 → 记录一笔
+
+那行点 **「记录关怀 / Log check-in」** → 弹窗填:
+- **关怀日期**(默认今天)
+- **方式:** 电话 / WhatsApp / 上门 / 邮件
+- **健康度:** 健康 / 留意 / 有风险
+- **客户反馈 / 备注:** 客户说了什么、满意度、提到的问题
+- **下次关怀间隔:** 7 / 14 / 30 / 90 天(刚签的盯紧点,稳定的拉长)
+
+保存后:下次关怀日期自动往后推、健康度更新。每次记录都存档(历史记录查看界面还没做,在 backlog)。
+
+---
+
 ## 5. Claims(员工报销)
 
 ### 员工申请报销
 
 `/claims` → **+ New Claim** → 填:
 - Date、Claimant(谁报)、Item(报销什么)、Amount、Category
-- (可选) Receipt link:Google Drive 链接
+- (可选) **Receipt 凭证**:直接选一张图/PDF → 保存时传 Google Drive(`OLCC Books/年份/Claims`)。没传的可之后点行内「补传凭证」补。
 
 状态自动是 **Pending**(待批)。
 
@@ -181,8 +217,10 @@ Dashboard "To Collect" 卡片,从上往下按到期紧急度排序。
 
 ### 实际付款给员工
 
-那行点 ✓ (CheckCircle2) → 状态变 **Paid**(已领)
-- 自动入账一笔 expense MYR XXX (category = Other Expense)
+那行点 ✓ (CheckCircle2) → **弹出对话框:**
+- **默认**:直接「确认已领」→ 记一笔营运 expense(从 **Operating Pool** 扣,category = Other Expense)。一般报销(车费/餐饮/用品)就这样。
+- **勾选「这笔是资本性支出」**:展开资本分类(设备/装修/注册/软件授权/其他)→ 记 capital_expense(从 **Capital Pool** 扣)。只有员工垫钱买了资本品时才勾。
+- 确认后状态变 **Paid**(已领),自动入账对应支出。
 
 ---
 
@@ -239,16 +277,17 @@ Dashboard "To Collect" 卡片,从上往下按到期紧急度排序。
 
 ## 7. Dashboard 看什么
 
-打开就看到:
-- **3 个 stat cards:** 本月 Income / Expense / Net(累计)
-- **6-Month Trend:** 横向柱图,绿色 income + 红色 expense,鼠标 hover 看具体数
+打开就看到(从上到下):
+- **顶部三栏等宽提醒卡**(最需要注意的事,放最上面):
+  - **To Collect:** 客户要付我们的(到期紧急的排前)
+  - **To Pay:** 我们要付的定期支出
+  - **Customers to check in:** 该做售后关怀的客户(见 §4b)
+  - 彩条:深红 = 已逾期 · 红 = 3 天内 · 黄 = 7 天内 · 绿 = 还宽松
+- **公司可用资金:** Capital Pool / Operating Pool / 总额(见 §5b)
+- **3 个 stat cards:** 本月 Income / Expense / Net(纯营运)
+- **6-Month Trend:** 收支柱图,绿 income + 红 expense
 - **Expense by Category:** 本月支出 donut + 分类百分比
 - **Recent Transactions:** 最近 8 笔,右上 "View all" 跳 /transactions
-- **To Collect / To Pay:** 接下来要催的钱 + 要付的钱,带颜色彩条
-  - 深红 = 已逾期
-  - 红 = 3 天内
-  - 黄 = 7 天内
-  - 绿 = 还宽松
 
 ---
 
@@ -270,10 +309,10 @@ Dashboard "To Collect" 卡片,从上往下按到期紧急度排序。
 ## 9. 邮件每日自动提醒(已经在跑)
 
 - **每天 09:00 (MYT)** Vercel 自动扫:
-  - 哪些 Subscriptions 到 `remind_days_before` 窗口 → 自动邮件催客户
-  - 哪些 Recurring 到提醒窗口 → 合并成 1 封 digest 发到 `cdcheng94@gmail.com`(可在 Settings 改公司 email)
+  - 哪些 Subscriptions 到提醒里程碑 → 自动邮件催客户。**按节点发,不刷屏**:到期前 `remind_days_before`(默认 7)天、3 天、当天各一封。
+  - 哪些 Recurring 到提醒窗口 → 合并成 1 封 digest 发到公司 email(Settings 里的 Contact email,目前 `developer@olcctechnology.com`)。
 
-你**不用做任何事**,自动跑。
+邮件从公司域名 **`noreply@send.olcctechnology.com`** 发出(已验证,可真发客户),客户回复会进 **`developer@olcctechnology.com`**。你**不用做任何事**,自动跑。
 
 ---
 
@@ -293,10 +332,11 @@ Dashboard "To Collect" 卡片,从上往下按到期紧急度排序。
 ### "想看上个月的"
 `/transactions` 顶部 Month 改一下。Dashboard 数据按当前自然月,要看历史只能去 transactions。
 
-### "Reseed 沙箱发件"
-现在邮件 from 是 `OLCC Books <onboarding@resend.dev>`(Resend 默认沙箱),只能发到 cdcheng94@gmail.com 一个邮箱(账号 verified 邮箱)。
-
-**正式上线发给所有客户的话**,需要在 Resend 后台 verify 一个 olcc-tech.com.my 之类的域名,然后改 Settings or env var `RESEND_FROM=billing@olcc-tech.com.my` 类似的。详见 HANDOVER.md。
+### "邮件发不出去 / 客户没收到"
+邮件域名 **已验证**(`send.olcctechnology.com`,Resend),可正常发真实客户。如果某封没到:
+- 先看 Resend 后台 **Logs**(resend.com,用 developer@olcctechnology.com 登入)有没有那封、状态是 Delivered 还是 Bounced。
+- 客户那边看一下垃圾邮件。
+- 都没有 → 找开发员看 Vercel function 日志。
 
 ### "Cron 没跑 / 没收到邮件"
 PowerShell 手动跑这条看返回值(把 token 替换成你的 CRON_SECRET):

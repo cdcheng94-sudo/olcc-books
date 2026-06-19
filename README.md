@@ -1,21 +1,25 @@
 # OLCC Books v2
 
-Internal bookkeeping system for OLCC Technology Sdn Bhd. Rewrite of the v1
-Apps Script version on a modern stack.
+Internal bookkeeping system for OLCC Technology Sdn Bhd, plus the customer
+billing + after-sales engine for **EduFlow** (the SaaS OLCC sells to tuition
+centres/schools). Rewrite of the v1 Apps Script version on a modern stack.
+Live in production at https://olcc-books.vercel.app.
 
-**Spec source of truth:** `OLCC-Books-2.0-网页版开发文档.md` (located in
-`../OLCC account system/`).
+> For a full, current narrative of what the system does, see
+> **`PROJECT_OVERVIEW.md`** (the discussion snapshot). Operators read
+> `OPERATIONS.md`; maintainers read `HANDOVER.md`.
 
 ## Tech stack
 
-- Next.js 15 (App Router) + TypeScript + React 19
-- Supabase: Postgres + Auth (Google OAuth) + Storage
-- Tailwind CSS + shadcn/ui primitives
-- Resend for transactional email
-- Gemini 2.5 Flash for receipt OCR
-- Recharts for dashboard charts (added in a later phase)
-- @react-pdf/renderer for invoice / receipt PDFs (added in a later phase)
-- Deployed on Vercel (auto-deploy from GitHub main branch)
+- Next.js 16 (App Router, Server Actions) + TypeScript + React 19
+- Supabase: Postgres (~11 tables, flat RLS) + Auth (Google OAuth + `allowed_emails` whitelist) + Storage
+- Tailwind CSS + shadcn/ui primitives — navy + gold theme, bilingual zh/en
+- Resend for transactional email (verified domain `send.olcctechnology.com`)
+- **Google Drive** (`googleapis`, `drive.file` scope) for user-uploaded receipt archival
+- Gemini 2.0 Flash for receipt OCR
+- Recharts for dashboard charts
+- @react-pdf/renderer for invoice / receipt PDFs (server-rendered)
+- Deployed on Vercel (auto-deploy from GitHub `main`, daily Cron)
 
 ## First-time setup
 
@@ -23,24 +27,23 @@ Apps Script version on a modern stack.
 # 1. Install deps
 npm install
 
-# 2. Copy env template and fill in values from Supabase/Resend/Gemini dashboards
-cp .env.local.example .env.local
+# 2. Fill .env.local from Supabase / Resend / Gemini / Google Drive dashboards
+#    (see HANDOVER.md §4 for the full env var list)
 
-# 3. Run database migrations against your Supabase project
-#    Open Supabase Dashboard → SQL Editor → paste each file under supabase/migrations/
-#    in order (0001 → 0002 → 0003) and click Run.
+# 3. Run database migrations against Supabase
+#    Supabase Dashboard → SQL Editor → run each file under supabase/migrations/
+#    in order (0001 → … → 0010) and click Run.
 
 # 4. Configure Google OAuth in Supabase
-#    Dashboard → Authentication → Providers → Google → enable + paste your
-#    Google Cloud OAuth Client ID + Secret. Add Authorized Redirect URI:
-#       https://<your-project>.supabase.co/auth/v1/callback
+#    Authentication → Providers → Google → enable + Client ID/Secret.
+#    Redirect URI: https://<project>.supabase.co/auth/v1/callback
 
-# 5. Run dev server
+# 5. Run dev server (webpack, not Turbopack — see HANDOVER.md §9.1)
 npm run dev
 ```
 
-Open http://localhost:3000 and sign in with a Google account whose email
-appears in the `allowed_emails` table (the seed inserts the owner email).
+Open http://localhost:3000 and sign in with a Google account whose email is in
+`allowed_emails` (the seed inserts the owner email).
 
 ## Directory map
 
@@ -48,75 +51,58 @@ appears in the `allowed_emails` table (the seed inserts the owner email).
 app/
 ├── (app)/                  # Authenticated app shell (sidebar + topbar)
 │   ├── layout.tsx          # Shell + whitelist gate
-│   ├── dashboard/
-│   ├── transactions/
-│   ├── invoices/
-│   ├── receipts/
-│   ├── recurring/
-│   ├── subscriptions/      # ← new in v2: bill customers
-│   ├── claims/
-│   └── settings/
-├── auth/
-│   ├── login/page.tsx      # Google OAuth button
-│   ├── callback/route.ts   # OAuth code → session
-│   ├── logout/route.ts
-│   └── error/page.tsx
-├── api/                    # cron + ocr + email (to be added)
-├── layout.tsx              # root layout with <LangProvider>
-├── page.tsx                # root → /dashboard or /auth/login
-└── globals.css             # OLCC theme (navy + gold)
+│   ├── dashboard/          # Stat cards, charts, 3-col reminder grid
+│   ├── transactions/       # Ledger (7 types) + OCR scan + Drive receipt upload
+│   ├── invoices/           # CRUD + PDF + email + Mark-Paid dialog
+│   ├── receipts/           # Auto (from invoice/subscription) + manual
+│   ├── recurring/          # Vendor payments we owe
+│   ├── subscriptions/      # Customer monthly billing (+ persistent % discount)
+│   ├── care/               # ← new: Customer Care (after-sales check-ins)
+│   ├── eduflow/            # 1-minute EduFlow customer onboarding
+│   ├── capital/            # Capital vs Operating fund pools (read-only report)
+│   ├── claims/             # Employee reimbursement workflow
+│   └── settings/           # Company info, banking, numbering, whitelist
+├── auth/                   # login / callback / logout / error
+├── api/
+│   ├── cron/daily-reminders/   # Vercel Cron (milestone reminders + digest)
+│   ├── ocr/parse-receipt/      # Gemini OCR
+│   └── drive/                  # Google Drive upload + OAuth setup-token/callback
+└── manifest.ts             # PWA manifest (home-screen icon)
 
-components/
-├── Sidebar.tsx             # left nav
-├── TopBar.tsx              # title + lang toggle + logout
-├── LangProvider.tsx        # bilingual zh/en context
-├── PageStub.tsx            # placeholder for unbuilt pages
-└── ui/                     # shadcn primitives
-
+components/                 # Sidebar, TopBar, LangProvider, charts/, ui/
 lib/
-├── supabase/
-│   ├── client.ts           # browser
-│   ├── server.ts           # server components
-│   └── middleware.ts       # session refresh middleware
-├── categories.ts           # income/expense + claim categories
-├── i18n.ts                 # zh/en dictionary
+├── supabase/               # browser + server clients
+├── queries/                # server SELECT helpers (transactions, capital, care, …)
+├── pdf/                    # InvoicePDF + ReceiptPDF + render
+├── drive.ts                # Google Drive upload/delete (server)
+├── drive-cleanup.ts        # delete linked Drive files on row delete
+├── upload-receipt.ts       # client compress → POST /api/drive/upload
+├── image.ts                # client image compression
+├── email.ts                # Resend wrapper (from + reply-to)
+├── numbering.ts            # INV-XXXX / RCP-XXXX
+├── categories.ts           # transaction / claim / capital / check-in constants
+├── recurring-utils.ts      # date math, urgency, reminder milestones
+├── eduflow-plans.ts        # 3 plan constants
 ├── types.ts                # DB row types
-└── utils.ts                # cn() + hasEnvVars
+└── i18n.ts                 # zh/en dictionary
 
-supabase/
-└── migrations/
-    ├── 0001_init.sql       # tables + RLS
-    ├── 0002_seed_settings.sql  # company info from v1 + first allowed email
-    └── 0003_storage.sql    # buckets + storage policies
-
-middleware.ts               # Next middleware → updateSession
-.env.local.example
+supabase/migrations/        # 0001_init … 0010_customer_care
+middleware.ts               # auth redirect (excludes api/cron, api/drive, assets)
+vercel.json                 # Cron config
 ```
 
-## Development order
+## Critical business rules (do not change)
 
-Follow `OLCC-Books-2.0-网页版开发文档.md` §9. After scaffolding, each
-phase is its own module — build, test, then continue.
-
-1. ✅ Scaffold + Supabase clients
-2. ✅ Schema migrations
-3. **Next**: wire Supabase project + run migrations + verify Google login
-4. Then in order: layout polish → Transactions → Dashboard → Recurring/Subscriptions → Claims → PDF → Invoices+Receipts → OCR → Deploy
-
-## Critical business rules (carried over from v1, do not change)
-
-- **Only Receipt creates an income Transaction.** Marking an invoice paid
-  creates a Receipt (with `linked_invoice_id`), which then cascades into
-  a Transaction. Prevents double-counting.
-- **Marking Recurring paid writes a real expense Transaction.** Not just
-  a status flip — cash flow must be visible.
-- **Marking Claim paid writes a real expense Transaction.** Same reason.
+- **Only a Receipt creates an income Transaction.** Marking an invoice or
+  subscription paid creates a Receipt, which cascades into one income
+  Transaction. Prevents double-counting.
+- **Marking Recurring/Claim paid writes a real expense Transaction.** Claims
+  can optionally cascade a `capital_expense` (Capital Pool) instead.
+- **Capital vs Operating pools must stay separate** (tax correctness):
+  shareholder loans / equity / repayments never hit P&L. See PROJECT_OVERVIEW §6.
 - **Category strings are immutable identifiers.** Add new ones to
   `lib/categories.ts`; never rename existing ones.
-
-## v1 reference
-
-The v1 Apps Script implementation lives in
-`../OLCC account system/apps-script/`. Its full architecture is
-documented in `../OLCC account system/SYSTEM_SUMMARY.md`. Several v1
-"gotchas" are eliminated by this stack — see SYSTEM_SUMMARY §12.
+- **A Drive failure must never block a save.** User-uploaded receipts go to
+  Google Drive; if Drive fails the row still saves (retry via the upload button).
+- **System-generated PDFs + logo stay on Supabase Storage; only user-uploaded
+  receipts go to Google Drive.**

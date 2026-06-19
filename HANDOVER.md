@@ -2,7 +2,9 @@
 
 > 给接手开发/运维的人。当前状态、所有服务、所有 env var、架构决策、已完成、未完成。
 >
-> **最后更新:** 2026-06-03,v2 已上线 + 全双语 + Discount(% 制)+ **资本/经营双资金池(股东借款/股本拆分)**。
+> **最后更新:** 2026-06-18。v2 已上线 + 全双语 + Discount(% 制)+ 资本/经营双资金池 + **Google Drive 凭证归档 + 客户关怀(Customer Care)+ 邮件域名验证(脱离沙箱)+ 发票/报销 Mark-Paid 弹窗**。
+>
+> 📌 想要一份**当前完整功能叙述**(拿去讨论用)看 `PROJECT_OVERVIEW.md`。本文偏开发/运维细节。
 
 ---
 
@@ -23,10 +25,10 @@ OLCC Technology 内部财务系统的 **完整重写版**,从 v1 的 Google Apps
 | 框架 | **Next.js 16.2.6 (App Router)** | Webpack dev (不用 Turbopack,内存兼容) |
 | 语言 | TypeScript 5 + React 19 | strict mode |
 | UI | **Tailwind CSS 3.4** + shadcn/ui 元件 | 自定义 navy + gold 主题 |
-| 数据库 | **Supabase Postgres** | 8 张表,flat RLS |
+| 数据库 | **Supabase Postgres** | ~11 张表,flat RLS |
 | Auth | **Supabase Auth + Google OAuth** | 加 `allowed_emails` 白名单 |
-| 文件存储 | **Supabase Storage** | 2 buckets: `receipts`, `pdfs` |
-| 邮件 | **Resend** (`resend` npm 包) | 沙箱 from,production 待 verify domain |
+| 文件存储 | **Supabase Storage + Google Drive** | Supabase 存系统生成的 PDF + logo;**用户上传的收据 → Google Drive**(`googleapis`,`drive.file` scope),见 §15 |
+| 邮件 | **Resend** (`resend` npm 包) | **已验证域名 `send.olcctechnology.com`(脱离沙箱,可真发客户)**;from + reply-to |
 | PDF | **@react-pdf/renderer** | 服务端渲染 → 上传 Storage → 返 signed URL |
 | 图表 | **Recharts** | 6 月柱图 + 分类 donut |
 | AI OCR | **Gemini 2.0 Flash** (REST API) | 收据解析,结构化 JSON 输出 |
@@ -43,16 +45,18 @@ OLCC Technology 内部财务系统的 **完整重写版**,从 v1 的 Google Apps
 | Vercel | https://vercel.com/cdcheng94-sudo/olcc-books | Hosting + Cron + Env vars | GitHub 登录 |
 | Supabase | https://supabase.com/dashboard/project/wfrzuzjbonmaulzufrdu | Postgres + Auth + Storage | yesteaching 账号 |
 | GitHub | https://github.com/cdcheng94-sudo/olcc-books | 源代码 | cdcheng94-sudo (Private) |
-| Google Cloud | https://console.cloud.google.com (Default Gemini Project) | OAuth Client + Gemini API key | yesteaching.com 组织 |
-| Resend | https://resend.com (cdcheng94@gmail.com 注册) | 邮件 | (沙箱模式) |
+| Google Cloud | https://console.cloud.google.com | OAuth Client + Gemini API key + **Drive API** | yesteaching.com 组织 |
+| Google Drive | (归档账号 chengdian@yesteaching.com 的云端硬盘) | 用户上传凭证归档,`drive.file` scope | 见 GOOGLE_DRIVE_SETUP.md |
+| Resend | https://resend.com | 邮件 | 团队登入 developer@olcctechnology.com(Admin);域名 send.olcctechnology.com 已验证 |
+| Squarespace | https://domains.squarespace.com | olcctechnology.com 的 DNS(发信域名记录) | developer@olcctechnology.com 账号(私人,资产待整理) |
 
 ---
 
 ## 4. 环境变量(Env Vars)
 
-### 4.1 全部 7 个
+### 4.1 全部约 13 个
 
-放在 **Vercel → Settings → Environment Variables**(Production / Preview / Development 三个 scope 都加)。
+放在 **Vercel → Settings → Environment Variables**(Production / Preview / Development scope)。
 
 | Key | 用途 | 类型 |
 |---|---|---|
@@ -60,9 +64,15 @@ OLCC Technology 内部财务系统的 **完整重写版**,从 v1 的 Google Apps
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase anon key(前端用) | public |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role(cron 用) | **secret** |
 | `GEMINI_API_KEY` | OCR 用 | secret |
-| `RESEND_API_KEY` | 邮件用 | secret |
-| `RESEND_FROM` | 邮件 from 字段 | public 但建议 secret |
+| `RESEND_API_KEY` | 邮件用(必须是 olcctechnology Resend 账号的 key) | secret |
+| `RESEND_FROM` | 邮件 from | `OLCC Technology <noreply@send.olcctechnology.com>` |
+| `RESEND_REPLY_TO` | 客户回复落点(默认 developer@olcctechnology.com) | public |
 | `CRON_SECRET` | Vercel Cron auth (Bearer token) | secret |
+| `GOOGLE_DRIVE_CLIENT_ID` | Drive OAuth client | secret |
+| `GOOGLE_DRIVE_CLIENT_SECRET` | Drive OAuth client | secret |
+| `GOOGLE_DRIVE_REFRESH_TOKEN` | Drive 归档账号 refresh token(失效要重做,见 GOOGLE_DRIVE_SETUP.md) | secret |
+| `GOOGLE_DRIVE_OWNER_EMAIL` | Drive 故障告警收件人(developer@olcctechnology.com) | public |
+| `DRIVE_SETUP_SECRET` | 守护 `/api/drive/setup-token` 的密钥 | secret |
 
 ### 4.2 本地 `.env.local` 模板
 
@@ -72,8 +82,14 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<sb_publishable_...>
 SUPABASE_SERVICE_ROLE_KEY=<sb_secret_...>
 GEMINI_API_KEY=<AIzaSy...>
 RESEND_API_KEY=<re_...>
-RESEND_FROM=OLCC Books <onboarding@resend.dev>
+RESEND_FROM=OLCC Technology <noreply@send.olcctechnology.com>
+RESEND_REPLY_TO=developer@olcctechnology.com
 CRON_SECRET=<32-byte hex>
+GOOGLE_DRIVE_CLIENT_ID=<...apps.googleusercontent.com>
+GOOGLE_DRIVE_CLIENT_SECRET=<...>
+GOOGLE_DRIVE_REFRESH_TOKEN=<1//...>
+GOOGLE_DRIVE_OWNER_EMAIL=developer@olcctechnology.com
+DRIVE_SETUP_SECRET=<random string>
 ```
 
 `.env.local` 在 `.gitignore` 里,**永远不 commit**。
@@ -82,7 +98,7 @@ CRON_SECRET=<32-byte hex>
 
 ## 5. Supabase 数据库 schema
 
-9 张表,migration 在 `supabase/migrations/` 已经跑过(0001–0008):
+约 11 张表,migration 在 `supabase/migrations/` 已经跑过(**0001–0010**):
 
 | 表 | 用途 | 关键 cascade |
 |---|---|---|
@@ -90,11 +106,13 @@ CRON_SECRET=<32-byte hex>
 | `allowed_emails` | 白名单 | — |
 | `shareholders` | 股东(资本池主体,0007 新增) | — |
 | `transactions` | 总账,**7 种 type**(见 §5.2) | 被 receipts/claims/recurring 级联写入 |
-| `invoices` | 开给客户的发票 | Mark Paid → 触发 createReceipt |
+| `invoices` | 开给客户的发票 | Mark Paid → 触发 createReceipt(+ 可附客户付款凭证到 Drive) |
 | `receipts` | 收据(自动 + 手动) | insert → 自动写一行 income transactions |
 | `recurring` | 我们付的月费 | Mark Paid → 写一行 expense transactions |
-| `subscriptions` | 客户付我们的月费 (v2 新增) | Mark Paid → 经 Receipt 级联 → income transaction |
-| `claims` | 员工报销 | markPaid → 写一行 expense transactions |
+| `subscriptions` | 客户付我们的月费 | Mark Paid → 经 Receipt 级联 → income;**0010 加 next_checkin_date / checkin_interval_days / health(客户关怀)** |
+| `claims` | 员工报销 | markPaid → expense 或 capital_expense;receipt_url 指 Drive |
+| `drive_files` | 用户上传凭证的 Drive 元数据(0009) | 删交易/报销时连带删 Drive 文件 |
+| `check_ins` | 客户关怀记录(0010) | 删订阅时 cascade 删 |
 
 ### 5.2 transactions 的 7 种 type + 资本池(0007/0008)
 
@@ -137,8 +155,8 @@ Outstanding(每股东)= Σshareholder_loan − Σloan_repayment   (股本 capita
 
 ### 5.2 RLS 策略
 
-所有 8 张表都启用 RLS,policy 是"authenticated 用户全权限"(flat 模型,内部 10 人以下)。
-Storage buckets `receipts` 和 `pdfs` 也是 authenticated only。
+所有表都启用 RLS,policy 是"authenticated 用户全权限"(flat 模型,内部 10 人以下)。
+Storage buckets `receipts` 和 `pdfs` 也是 authenticated only。Google Drive 那边不靠 RLS,所有 Drive 调用都在 server side 用归档账号的 refresh_token(见 §15)。
 
 ---
 
@@ -155,13 +173,16 @@ olcc-books/
 │   │   ├── receipts/                # 收据 (CRUD + PDF + email,自动从 invoice 级联)
 │   │   ├── recurring/               # 我们付的月费
 │   │   ├── subscriptions/           # 客户付我们的月费 (v2 新)
+│   │   ├── care/                    # 客户关怀 (check-in 提醒 + 记录,0010)
 │   │   ├── eduflow/                 # EduFlow 客户 1 分钟 onboard
-│   │   ├── claims/                  # 员工报销
+│   │   ├── capital/                 # 资本池只读报表 (0007/0008)
+│   │   ├── claims/                  # 员工报销 (Drive 凭证 + 营运/资本选择)
 │   │   └── settings/                # 改公司资料/银行/白名单
 │   ├── auth/                        # /auth/login /auth/callback 等
 │   └── api/
 │       ├── cron/daily-reminders/    # Vercel Cron 入口
-│       └── ocr/parse-receipt/       # Gemini OCR API
+│       ├── ocr/parse-receipt/       # Gemini OCR API
+│       └── drive/                   # upload + setup-token + oauth-callback(Google Drive)
 ├── components/
 │   ├── Sidebar.tsx                  # 左侧 nav
 │   ├── TopBar.tsx                   # 顶部标题 + 语言切换 + 登出
@@ -222,7 +243,14 @@ olcc-books/
 | **Discount(金额版)** | invoices/receipts 加固定金额折扣 | `0005_add_discount.sql` |
 | **Discount(% 版)** | 折扣改百分比;Subscriptions 持久折扣每期自动套用;Subscription Mark Paid 改走 Receipt 级联 | `0006_discount_percent.sql` + invoices/receipts/subscriptions/eduflow actions + 两个 PDF + 表单 |
 | **资本/经营双资金池** | transactions type → 6 种 + shareholders 表 + /capital 页 + Dashboard 资金池卡 | `0007_capital_pools.sql` + `lib/queries/capital.ts` + `app/(app)/capital/*` + transactions 全套 |
-| **借款/股本拆分** ← 最新 | shareholder_loan(债)与 capital_injection(股本)拆成两个 type;Outstanding 只算借款 | `0008_shareholder_loan_split.sql` |
+| **借款/股本拆分** | shareholder_loan(债)与 capital_injection(股本)拆成两个 type;Outstanding 只算借款 | `0008_shareholder_loan_split.sql` |
+| **Google Drive 凭证归档** | 用户上传的收据/凭证从 Supabase 改存 Google Drive(系统 PDF + logo 仍 Supabase);drive_files 元数据 + 补传 + 删除连带清理 + 故障告警 | `0009_drive_files.sql` + `lib/drive.ts` `lib/drive-cleanup.ts` `lib/upload-receipt.ts` `lib/image.ts` + `app/api/drive/*` + transactions/claims 表单 |
+| **邮件域名验证** | Resend 验证 send.olcctechnology.com(脱离沙箱)、reply-to、旧 olcctechnology@gmail.com 账号迁移到 developer@ | `lib/email.ts`(FROM + REPLY_TO);DNS 在 Squarespace |
+| **订阅催费里程碑制** | cron 从"每天发"改成只在 remind_days_before / 3 / 0 天发 | `lib/recurring-utils.ts`(reminderMilestones)+ cron |
+| **发票 Mark-Paid 弹窗** | 加收款日期 + 付款方式 + 上传客户付款凭证(→ Drive) | `app/(app)/invoices/MarkPaidModal.tsx` + actions(paidDate) |
+| **报销 Mark-Paid 营运/资本选择** | 默认 expense(Operating Pool),可勾资本性支出 → capital_expense(Capital Pool) | `app/(app)/claims/MarkClaimPaidModal.tsx` + actions |
+| **客户关怀(Customer Care)** | 售后 check-in 提醒页 + 记录弹窗 + Dashboard 卡 + 新订阅自动排首次关怀 | `0010_customer_care.sql` + `app/(app)/care/*` + `lib/queries/care.ts` |
+| **Dashboard 三栏提醒** | To Collect / To Pay / Customers-to-check-in 移到顶部等宽三栏 | `app/(app)/dashboard/DashboardClient.tsx` |
 
 每个 Phase / patch 的 commit message 在 `git log` 里完整写了背景。
 
@@ -272,7 +300,19 @@ Supabase Google OAuth 任何 Google 账号都能登录,所以加 `allowed_emails
 
 ### 9.6 Cron auth 用 Bearer + middleware 跳过
 Vercel Cron 用 `Authorization: Bearer ${CRON_SECRET}` 调 `/api/cron/*`。
-middleware 的 matcher 排除 `api/cron`,否则 Supabase session check 把 cron 重定向到 /auth/login。
+middleware 的 matcher 排除 `api/cron`(也排除 `api/drive`),否则 Supabase session check 把它们重定向到 /auth/login。
+
+### 9.7 Google Drive 凭证归档(`lib/drive.ts`)
+- **分工:** 用户上传的收据/凭证 → Google Drive;**系统生成的 Invoice/Receipt PDF + logo 继续留 Supabase Storage**(刻意不动)。
+- **scope `drive.file`:** app 只能碰自己建的文件,看不到归档账号的其他 Drive 内容(最小权限)。app 自建根目录 `OLCC Books`,再按 `年份/{Receipts|Claims|Capital}` 分。
+- **认证:** 所有 Drive 调用在 server side,用归档账号(chengdian@yesteaching.com)的 `GOOGLE_DRIVE_REFRESH_TOKEN`(OAuth 选 Internal user type,避免 7 天 token 过期)。**refresh_token 绝不暴露给前端。** 重新授权流程见 `GOOGLE_DRIVE_SETUP.md` + `/api/drive/setup-token`。
+- **容错(硬要求):** Drive 失败(invalid_grant/quota/网络)不能让交易保存失败 —— `/api/drive/upload` 返回 `{ok:false, kind}`(status 200),行照存,前端提示「可补传」;auth/quota 故障 debounce 6h 邮件告警 owner。
+- **流程:** 客户端 `lib/image.ts` 压到 1600px → `lib/upload-receipt.ts` POST `/api/drive/upload` → server `uploadToDrive` → 写 `drive_files` 行 → 回填 `{table}.receipt_url`(Drive webViewLink)。删行时 `lib/drive-cleanup.ts` 连带删 Drive 文件。
+
+### 9.8 邮件域名 + 账号
+- 发信域名 `send.olcctechnology.com`(Resend Tokyo 区),DNS 在 **Squarespace**(DKIM/SPF/MX 已验证)。代码读 `RESEND_FROM` + `RESEND_REPLY_TO`,改地址只改 env,不动代码。
+- ⚠️ `RESEND_API_KEY` 必须是 **olcctechnology Resend 账号**的 key(域名验证在这个账号);用别的账号的 key 会发不出(域名未验证)。
+- 详细域名/DNS/账号迁移记录见 auto-memory `olcc_email_domain.md`(以及 git 历史)。
 
 ---
 
@@ -280,21 +320,19 @@ middleware 的 matcher 排除 `api/cron`,否则 Supabase session check 把 cron 
 
 | 项 | 状态 | 优先级 |
 |---|---|---|
-| Resend domain verify(目前沙箱,只能发到 cdcheng94@gmail.com) | 待做 | **客户多了必做** |
-| 自定义 `RESEND_FROM` env 到正式域名 | 待做 | 跟上面捆绑 |
-| Subscription 自动 mark paid(目前到期还是要手动点 ✓;客户真的转账后才点) | 待考虑 | 中 |
-| 自动发 receipt 邮件给客户(目前 mark paid 生成 receipt 但不自动发,要手动点 ✉) | 待做 | 中 |
-| `middleware.ts` deprecation → Next 16 改 `proxy.ts` | Next 16 deprecation warning | 低,不影响功能 |
-| Mark Paid invoice 后,PDF 还显示 DRAFT(因为 pdf_url cache 没失效) | 已知小 bug | 低 |
-| 月度 / 年度报表(P&L) | 没做 | 中 |
-| 数据导出 CSV / Excel | 没做 | 低 |
-| 多公司支持(目前只 OLCC Technology 一家) | 没做 | 长期 |
-| Stripe Checkout 自动收 EduFlow 客户款 | 没做 | 客户达到 20+ 单时上 |
-| EduFlow tenant 状态 dashboard(哪些客户健康/即将到期 / MRR) | 没做 | 长期 |
-| Dashboard "Quick Add" 按钮(顶部快捷开 income/expense) | 没做 | 低 |
-| 操作日志 / audit log | 没做 | 中(合规需要) |
-| Discount 可叠加固定金额 + %(目前只 %) | 没做 | 低 |
-| PDF line item 名称中文化(目前 EduFlow line item 永远英文) | 没做 | 低 |
+| ~~Resend domain verify~~ | ✅ 已做(send.olcctechnology.com 已验证,可真发客户) | — |
+| 客户关怀:**查看历史关怀记录 UI** | check_ins 数据已存,`listCheckIns()` 已有,差界面(点行 → 历史) | **中,做起来快** |
+| 客户关怀:到期发团队提醒邮件 / 流失风险 + MRR 统计 | 没做(Phase 2) | 中 |
+| Subscription 自动 mark paid / Stripe Checkout 自动收款 | 没做 | 客户 20+ 单时考虑 |
+| 自动发 receipt 邮件给客户(mark paid 后要手动点 ✉) | 没做 | 中 |
+| 利息自动计算(interest_rate 存了但靠手动录) | 没做 | 中 |
+| 资本性支出超支护栏(Capital Pool 可被花成负) | 没做 | 低 |
+| 月度 / 年度 P&L 报表 + 数据导出 CSV/Excel | 没做 | 中(会计需要) |
+| 操作日志 / audit log | 没做 | 中(合规) |
+| `middleware.ts` deprecation → Next 16 `proxy.ts` | deprecation warning,不影响功能 | 低 |
+| Mark Paid invoice 后 PDF 仍显示 DRAFT(pdf_url cache) | 已知小 bug | 低 |
+| 多公司 / 白标支持 | 没做 | 长期 |
+| 资产整理:olcctechnology.com 域名 + Resend Owner 转到公司账号 | developer@ Admin 够用,Owner 可能仍旧 Gmail | 低 |
 
 ---
 
@@ -351,6 +389,8 @@ git push
 
 Supabase SQL Editor 跑:
 ```sql
+delete from public.check_ins;
+delete from public.drive_files;     -- 注:只删元数据,Drive 上的文件不会自动删
 delete from public.transactions;
 delete from public.receipts;
 delete from public.invoices;
@@ -361,7 +401,8 @@ update public.settings set value = '1' where key = 'next_invoice_seq';
 update public.settings set value = '1' where key = 'next_receipt_seq';
 ```
 
-不会动 `settings` 公司资料 + `allowed_emails`。
+不会动 `settings` 公司资料 + `allowed_emails` + `shareholders`。
+⚠️ 清 `drive_files` 不会删 Google Drive 上的实体文件,要的话去归档账号 Drive 手动清理。
 
 ### 12.5 手动触发 cron(测试)
 
