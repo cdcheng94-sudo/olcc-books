@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Pencil, Trash2, CheckCircle2, PauseCircle, PlayCircle, MessageCircle, Mail } from "lucide-react";
+import { Plus, Pencil, Trash2, CheckCircle2, PauseCircle, PlayCircle, MessageCircle, Mail, FilePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useLang } from "@/components/LangProvider";
@@ -9,7 +9,7 @@ import { interp } from "@/lib/i18n";
 import { fmtDate, fmtMoney } from "@/lib/format";
 import { daysUntilDue, urgencyFor, localizedDaysLabel } from "@/lib/recurring-utils";
 import type { SubscriptionRow } from "@/lib/types";
-import { deleteSubscription, markSubscriptionPaid, updateSubscription } from "./actions";
+import { deleteSubscription, markSubscriptionPaid, updateSubscription, generateInvoiceForSubscription } from "./actions";
 import { SubscriptionFormModal } from "./SubscriptionFormModal";
 
 function whatsappLink(phone: string, message: string): string {
@@ -64,13 +64,30 @@ export function SubscriptionsClient({ initialRows }: { initialRows: Subscription
     const newStatus = row.status === "active" ? "paused" : "active";
     startTransition(async () => {
       try {
+        // pass every field through — otherwise validate() would reset
+        // discount_percent / auto_invoice to their defaults on a status flip.
         await updateSubscription(row.id, {
           customer_name: row.customer_name, customer_email: row.customer_email || undefined,
           customer_phone: row.customer_phone || undefined, service_desc: row.service_desc,
-          amount: row.amount, frequency: row.frequency, next_charge_date: row.next_charge_date,
-          remind_days_before: row.remind_days_before, status: newStatus,
+          amount: row.amount, discount_percent: row.discount_percent, frequency: row.frequency,
+          next_charge_date: row.next_charge_date, remind_days_before: row.remind_days_before,
+          status: newStatus, auto_invoice: row.auto_invoice,
         });
         setRows((prev) => prev.map((x) => x.id === row.id ? { ...x, status: newStatus } : x));
+      } catch (e) { alert(t.errors.failed + (e as Error).message); }
+    });
+  }
+
+  function onGenInvoice(row: SubscriptionRow) {
+    startTransition(async () => {
+      try {
+        const r = await generateInvoiceForSubscription(row.id);
+        if (r.ok) {
+          alert(interp(t.subscriptions.genInvoiceOk, { number: r.invoice_number || "" }));
+          setRows((prev) => prev.map((x) => x.id === row.id ? { ...x, last_invoiced_date: x.next_charge_date } : x));
+        } else if (r.already) {
+          alert(t.subscriptions.genInvoiceAlready);
+        }
       } catch (e) { alert(t.errors.failed + (e as Error).message); }
     });
   }
@@ -163,7 +180,12 @@ export function SubscriptionsClient({ initialRows }: { initialRows: Subscription
                           <Mail className="w-4 h-4" />
                         </a>
                       )}
-                      {r.status === "active" && (
+                      {r.status === "active" && r.auto_invoice && (
+                        <button onClick={() => onGenInvoice(r)} disabled={isPending} className="p-1.5 hover:bg-navy/10 rounded text-muted-foreground hover:text-navy" title={t.subscriptions.tipGenInvoice}>
+                          <FilePlus className="w-4 h-4" />
+                        </button>
+                      )}
+                      {r.status === "active" && !r.auto_invoice && (
                         <button onClick={() => onMarkPaid(r)} disabled={isPending} className="p-1.5 hover:bg-success/10 rounded text-muted-foreground hover:text-success" title={t.subscriptions.tipMarkPaid}>
                           <CheckCircle2 className="w-4 h-4" />
                         </button>

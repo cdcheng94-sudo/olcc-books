@@ -4,6 +4,7 @@ import { fmtMoney } from "@/lib/format";
 import { daysUntilDue, daysLabel, shouldRemindToday } from "@/lib/recurring-utils";
 import { getSettings } from "@/lib/queries/settings";
 import { sendSubscriptionReminder, sendRecurringDigest } from "@/lib/email";
+import { createCycleInvoice } from "@/lib/subscription-invoice";
 import type { RecurringRow, SubscriptionRow } from "@/lib/types";
 
 /**
@@ -57,13 +58,28 @@ export async function GET(request: Request) {
     .eq("status", "active");
   if (subErr) return NextResponse.json({ error: `subs: ${subErr.message}` }, { status: 500 });
 
-  let subSent = 0;
+  const today = new Date().toISOString().slice(0, 10);
+  let subSent = 0, invoicesCreated = 0;
   const subErrors: string[] = [];
+  const invoiceErrors: string[] = [];
   for (const s of (subs || []) as SubscriptionRow[]) {
-    if (!s.customer_email) continue;
     const days = daysUntilDue(s.next_charge_date);
-    // Only email on fixed milestones (e.g. 7 / 3 / 0 days before) so the
-    // customer gets a handful of reminders, not one every single day.
+
+    // Auto-invoice: for subs that opted in, create the cycle's draft invoice
+    // once it enters the reminder window. createCycleInvoice dedups per cycle
+    // (via last_invoiced_date), so running daily won't make duplicates.
+    if (s.auto_invoice && days <= s.remind_days_before) {
+      try {
+        const inv = await createCycleInvoice(supabase, s, today);
+        if (inv) invoicesCreated++;
+      } catch (e) {
+        invoiceErrors.push(`${s.customer_name}: ${(e as Error).message}`);
+      }
+    }
+
+    // Reminder email: needs a customer email + a milestone day (7 / 3 / 0
+    // before) so the customer gets a handful of reminders, not one daily.
+    if (!s.customer_email) continue;
     if (!shouldRemindToday(days, s.remind_days_before)) continue;
 
     try {
@@ -119,9 +135,11 @@ export async function GET(request: Request) {
     ok: true,
     at: new Date().toISOString(),
     subscriptions: {
-      considered: (subs || []).length,
-      sent:       subSent,
-      errors:     subErrors,
+      considered:       (subs || []).length,
+      sent:             subSent,
+      invoices_created: invoicesCreated,
+      errors:           subErrors,
+      invoice_errors:   invoiceErrors,
     },
     recurring: {
       considered:  (rec || []).length,

@@ -9,6 +9,7 @@ import { renderAndUploadPDF, refreshSignedUrl } from "@/lib/pdf/render";
 import { InvoicePDF } from "@/lib/pdf/InvoicePDF";
 import { sendInvoiceEmail } from "@/lib/email";
 import { fmtMoney } from "@/lib/format";
+import { advanceDate, type Frequency } from "@/lib/recurring-utils";
 import { createReceipt } from "../receipts/actions";
 import type { InvoiceRow, InvoiceStatus, LineItem } from "@/lib/types";
 
@@ -242,6 +243,21 @@ export async function markInvoicePaid(id: string, paymentMethod: string = "Bank 
 
   // Flip invoice status
   await supabase.from("invoices").update({ status: "paid" }).eq("id", id);
+
+  // If this invoice was auto-generated from a subscription cycle, roll that
+  // subscription forward so the next cycle can bill (single collection path:
+  // pay the invoice → receipt + income + subscription advances).
+  if (inv.subscription_id) {
+    const { data: sub } = await supabase
+      .from("subscriptions").select("frequency, next_charge_date").eq("id", inv.subscription_id).maybeSingle();
+    if (sub) {
+      const next = advanceDate(sub.next_charge_date, sub.frequency as Frequency);
+      await supabase.from("subscriptions")
+        .update({ last_charged_date: date, next_charge_date: next })
+        .eq("id", inv.subscription_id);
+      revalidatePath("/subscriptions");
+    }
+  }
 
   // The cascade inserts an income transaction tagged with linked_doc_id =
   // receipt.id. Return its id so the UI can attach the customer's payment

@@ -75,6 +75,7 @@ export type InvoiceRow = {
   status: InvoiceStatus;
   note: string | null;
   pdf_url: string | null;
+  subscription_id: UUID | null;   // set when auto-generated from a subscription cycle (0011)
   created_at: ISODateTime;
 };
 
@@ -155,6 +156,9 @@ export type SubscriptionRow = {
   next_checkin_date: ISODate | null;
   checkin_interval_days: number;
   health: CustomerHealth;
+  // auto-invoice fields (migration 0011)
+  auto_invoice: boolean;
+  last_invoiced_date: ISODate | null;
 };
 
 // ---------- check_ins (customer-care log) ----------

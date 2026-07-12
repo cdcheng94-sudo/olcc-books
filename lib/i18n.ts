@@ -400,6 +400,11 @@ export const T = {
       confirmMarkPaid: "标记已收?\n\n会入账 {amount} 一笔收入,并把下次扣款日按 {freq} 往后推。",
       waMessage:       "{name} 您好,这是友好提醒:您订阅的「{service}」({amount}) 即将到期。如需账号详情请回复此消息。谢谢!",
       paused:          "(已暂停)",
+      autoInvoice:     "到期自动开发票",
+      autoInvoiceHint: "订阅每期到期时自动生成一张 draft 发票(适合需要正式发票 PDF 的客户)。付这张发票时会自动推进到下一期。",
+      tipGenInvoice:   "生成本期发票",
+      genInvoiceOk:    "已生成发票 {number},去 Invoices 页可查看 / 发送。",
+      genInvoiceAlready:"本期已经开过发票了(在 Invoices 页找)。",
     },
     care: {
       title:           "客户关怀",
@@ -973,6 +978,11 @@ export const T = {
       confirmMarkPaid: "Mark as paid?\n\nThis records an income transaction of {amount} and advances the next charge date by {freq}.",
       waMessage:       "Hi {name}, this is a friendly reminder that your subscription \"{service}\" ({amount}) is due. Bank transfer details available on request. Thank you!",
       paused:          "(paused)",
+      autoInvoice:     "Auto-create invoice each cycle",
+      autoInvoiceHint: "Automatically generate a draft invoice each billing cycle (for customers who need a formal invoice PDF). Paying that invoice rolls the subscription forward to the next cycle.",
+      tipGenInvoice:   "Generate this cycle's invoice",
+      genInvoiceOk:    "Invoice {number} created — view / send it on the Invoices page.",
+      genInvoiceAlready:"This cycle is already invoiced (find it on the Invoices page).",
     },
     care: {
       title:           "Customer Care",

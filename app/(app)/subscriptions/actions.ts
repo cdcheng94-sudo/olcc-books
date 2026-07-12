@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { advanceDate, addDays, FREQUENCIES, type Frequency } from "@/lib/recurring-utils";
 import { todayIso } from "@/lib/format";
 import { createReceipt } from "../receipts/actions";
+import { createCycleInvoice } from "@/lib/subscription-invoice";
 import type { SubscriptionRow } from "@/lib/types";
 
 export type SubscriptionInput = {
@@ -19,6 +20,7 @@ export type SubscriptionInput = {
   next_charge_date: string;       // YYYY-MM-DD
   remind_days_before?: number;
   status?: "active" | "paused";
+  auto_invoice?: boolean;         // auto-generate a draft invoice each cycle
 };
 
 function validate(input: SubscriptionInput): Required<Omit<SubscriptionInput, "id" | "customer_email" | "customer_phone">> & Pick<SubscriptionInput, "id" | "customer_email" | "customer_phone"> {
@@ -43,6 +45,7 @@ function validate(input: SubscriptionInput): Required<Omit<SubscriptionInput, "i
     next_charge_date:   input.next_charge_date,
     remind_days_before: isFinite(remind) && remind >= 0 ? remind : 7,
     status:             input.status === "paused" ? "paused" : "active",
+    auto_invoice:       !!input.auto_invoice,
   };
 }
 
@@ -60,6 +63,7 @@ export async function createSubscription(input: SubscriptionInput) {
     next_charge_date: c.next_charge_date,
     remind_days_before: c.remind_days_before,
     status: c.status,
+    auto_invoice: c.auto_invoice,
     // first after-sales check-in falls due a week after signup
     next_checkin_date: addDays(todayIso(), 7),
   }).select().single();
@@ -83,6 +87,7 @@ export async function updateSubscription(id: string, input: SubscriptionInput) {
     next_charge_date: c.next_charge_date,
     remind_days_before: c.remind_days_before,
     status: c.status,
+    auto_invoice: c.auto_invoice,
   }).eq("id", id).select().single();
   if (error) throw new Error(error.message);
   revalidatePath("/subscriptions");
@@ -154,4 +159,21 @@ export async function markSubscriptionPaid(id: string) {
   revalidatePath("/transactions");
   revalidatePath("/receipts");
   return { ok: true, next_charge_date: next };
+}
+
+/**
+ * Manually generate the current-cycle draft invoice for a subscription
+ * (same thing the daily cron does for auto_invoice subs, on demand).
+ * Returns { already: true } if this cycle was already invoiced.
+ */
+export async function generateInvoiceForSubscription(id: string): Promise<{ ok: boolean; already?: boolean; invoice_number?: string }> {
+  const supabase = await createClient();
+  const { data: sub, error } = await supabase.from("subscriptions").select("*").eq("id", id).single();
+  if (error || !sub) throw new Error("Subscription not found.");
+
+  const inv = await createCycleInvoice(supabase, sub as SubscriptionRow, todayIso());
+  revalidatePath("/invoices");
+  revalidatePath("/subscriptions");
+  if (!inv) return { ok: false, already: true };
+  return { ok: true, invoice_number: inv.invoice_number };
 }

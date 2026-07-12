@@ -30,6 +30,7 @@ export function SubscriptionFormModal({ open, onOpenChange, editing, onSaved }: 
   const [nextCharge, setNextCharge]       = useState(todayIso());
   const [remindDays, setRemindDays]       = useState("7");
   const [status, setStatus]               = useState<"active" | "paused">("active");
+  const [autoInvoice, setAutoInvoice]     = useState(false);
   const [error, setError]                 = useState<string | null>(null);
   const [isPending, startTransition]      = useTransition();
 
@@ -47,10 +48,11 @@ export function SubscriptionFormModal({ open, onOpenChange, editing, onSaved }: 
       setNextCharge(editing.next_charge_date.substring(0, 10));
       setRemindDays(String(editing.remind_days_before));
       setStatus(editing.status);
+      setAutoInvoice(!!editing.auto_invoice);
     } else {
       setCustomerName(""); setCustomerEmail(""); setCustomerPhone(""); setServiceDesc("");
       setAmount(""); setDiscount("0"); setFrequency("monthly"); setNextCharge(todayIso());
-      setRemindDays("7"); setStatus("active");
+      setRemindDays("7"); setStatus("active"); setAutoInvoice(false);
     }
   }, [open, editing]);
 
@@ -69,6 +71,7 @@ export function SubscriptionFormModal({ open, onOpenChange, editing, onSaved }: 
           next_charge_date: nextCharge,
           remind_days_before: Number(remindDays),
           status,
+          auto_invoice: autoInvoice,
         };
         const saved = editing ? await updateSubscription(editing.id, payload) : await createSubscription(payload);
         onSaved(saved as SubscriptionRow);
@@ -148,6 +151,13 @@ export function SubscriptionFormModal({ open, onOpenChange, editing, onSaved }: 
               <option value="paused">{t.status.paused}</option>
             </select>
           </div>
+          <label className="col-span-2 flex items-start gap-2 cursor-pointer rounded-md bg-muted/30 px-3 py-2">
+            <input type="checkbox" checked={autoInvoice} onChange={(e) => setAutoInvoice(e.target.checked)} className="mt-0.5 accent-navy" />
+            <span>
+              <span className="text-sm font-medium">{t.subscriptions.autoInvoice}</span>
+              <span className="block text-[11px] text-muted-foreground">{t.subscriptions.autoInvoiceHint}</span>
+            </span>
+          </label>
           {error && <div className="col-span-2 text-sm text-destructive">{error}</div>}
           <DialogFooter className="col-span-2 mt-2">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isPending}>{t.common.cancel}</Button>
