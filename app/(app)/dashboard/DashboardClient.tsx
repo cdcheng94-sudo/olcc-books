@@ -183,32 +183,34 @@ export function DashboardClient({ summary, toPay, toCollect, careDue, trend, byC
         </Card>
       </div>
 
-      {/* Fund pools — Capital vs Operating */}
+      {/* Company funds (hero) — Capital + Operating shown small underneath */}
       <Card className="mb-6">
-        <CardHeader className="flex-row items-center gap-2 space-y-0 pb-3">
+        <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
           <Coins size={18} className="text-gold" />
           <CardTitle className="text-sm font-bold">{t.dashboard.totalAvailableFunds}</CardTitle>
-          <span className="ml-auto text-sm font-bold tabular-nums">
-            {t.dashboard.poolTotal}: <span className="text-navy">{fmtMoney(pools.total)}</span>
-          </span>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="rounded-lg border-2 border-primary/20 bg-primary/[0.04] p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Landmark size={16} className="text-navy" />
-                <span className="text-xs font-semibold text-navy">{t.dashboard.capitalPool}</span>
+          {/* hero: total = bank balance */}
+          <div className="text-4xl font-bold text-navy tabular-nums leading-none">{fmtMoney(pools.total)}</div>
+          <div className="text-[11px] text-muted-foreground mt-1.5">{t.dashboard.matchesBank}</div>
+
+          {/* small breakdown: where the money came from */}
+          <div className="grid grid-cols-2 gap-3 mt-4">
+            <div className="rounded-md border border-primary/20 bg-primary/[0.04] px-3 py-2">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <Landmark size={13} className="text-navy" />
+                <span className="text-[11px] font-semibold text-navy">{t.dashboard.capitalPool}</span>
               </div>
-              <div className="text-2xl font-bold text-navy tabular-nums">{fmtMoney(pools.capitalPool)}</div>
-              <div className="text-[11px] text-muted-foreground mt-0.5">{t.capital.capitalPoolDesc}</div>
+              <div className="text-base font-bold text-navy tabular-nums">{fmtMoney(pools.capitalPool)}</div>
+              <div className="text-[10px] text-muted-foreground">{t.capital.capitalPoolDesc}</div>
             </div>
-            <div className="rounded-lg border-2 border-gold/30 bg-gold/[0.06] p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Briefcase size={16} className="text-gold" />
-                <span className="text-xs font-semibold" style={{ color: "hsl(var(--gold))" }}>{t.dashboard.operatingPool}</span>
+            <div className="rounded-md border border-gold/30 bg-gold/[0.06] px-3 py-2">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <Briefcase size={13} className="text-gold" />
+                <span className="text-[11px] font-semibold" style={{ color: "hsl(var(--gold))" }}>{t.dashboard.operatingPool}</span>
               </div>
-              <div className="text-2xl font-bold tabular-nums" style={{ color: "hsl(var(--gold))" }}>{fmtMoney(pools.operatingPool)}</div>
-              <div className="text-[11px] text-muted-foreground mt-0.5">{t.capital.operatingPoolDesc}</div>
+              <div className="text-base font-bold tabular-nums" style={{ color: "hsl(var(--gold))" }}>{fmtMoney(pools.operatingPool)}</div>
+              <div className="text-[10px] text-muted-foreground">{t.capital.operatingPoolDesc}</div>
             </div>
           </div>
         </CardContent>

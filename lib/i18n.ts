@@ -133,6 +133,7 @@ export const T = {
       emptyRec:        "暂无数据 — 新增一笔定期付款",
       careTitle:       "该关心的客户",
       careEmpty:       "暂时没有待关怀的客户",
+      matchesBank:     "= 你的银行户口余额",
     },
     tx: {
       title:           "收支记录",
@@ -705,6 +706,7 @@ export const T = {
       emptyRec:        "No data — add a recurring payment",
       careTitle:       "Customers to check in",
       careEmpty:       "No customers due for a check-in",
+      matchesBank:     "= your bank account balance",
     },
     tx: {
       title:           "Transactions",
