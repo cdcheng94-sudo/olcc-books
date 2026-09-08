@@ -2,7 +2,9 @@
 
 > 给接手开发/运维的人。当前状态、所有服务、所有 env var、架构决策、已完成、未完成。
 >
-> **最后更新:** 2026-06-18。v2 已上线 + 全双语 + Discount(% 制)+ 资本/经营双资金池 + **Google Drive 凭证归档 + 客户关怀(Customer Care)+ 邮件域名验证(脱离沙箱)+ 发票/报销 Mark-Paid 弹窗**。
+> **最后更新:** 2026-09-08。v2 已上线 + 全双语 + Discount(% 制)+ 资本/经营双资金池 + Google Drive 凭证归档 + 客户关怀(Customer Care)+ 邮件域名验证(脱离沙箱)+ 发票/报销 Mark-Paid 弹窗 + **订阅每期自动开发票(migration 0011)+ Dashboard 总资金 hero**。
+>
+> ℹ️ 最后一次功能提交是 2026-07-12(`c4548a8`)。若你接手时间离这个日期很远,先 `git log` 看有没有新东西。
 >
 > 📌 想要一份**当前完整功能叙述**(拿去讨论用)看 `PROJECT_OVERVIEW.md`。本文偏开发/运维细节。
 
@@ -98,7 +100,7 @@ DRIVE_SETUP_SECRET=<random string>
 
 ## 5. Supabase 数据库 schema
 
-约 11 张表,migration 在 `supabase/migrations/` 已经跑过(**0001–0010**):
+约 11 张表,migration 在 `supabase/migrations/` 已经跑过(**0001–0011**):
 
 | 表 | 用途 | 关键 cascade |
 |---|---|---|
@@ -106,10 +108,10 @@ DRIVE_SETUP_SECRET=<random string>
 | `allowed_emails` | 白名单 | — |
 | `shareholders` | 股东(资本池主体,0007 新增) | — |
 | `transactions` | 总账,**7 种 type**(见 §5.2) | 被 receipts/claims/recurring 级联写入 |
-| `invoices` | 开给客户的发票 | Mark Paid → 触发 createReceipt(+ 可附客户付款凭证到 Drive) |
+| `invoices` | 开给客户的发票 | Mark Paid → 触发 createReceipt(+ 可附客户付款凭证到 Drive);**0011 加 `subscription_id` FK —— 有值时 Mark Paid 还会推进那张订阅** |
 | `receipts` | 收据(自动 + 手动) | insert → 自动写一行 income transactions |
 | `recurring` | 我们付的月费 | Mark Paid → 写一行 expense transactions |
-| `subscriptions` | 客户付我们的月费 | Mark Paid → 经 Receipt 级联 → income;**0010 加 next_checkin_date / checkin_interval_days / health(客户关怀)** |
+| `subscriptions` | 客户付我们的月费 | Mark Paid → 经 Receipt 级联 → income;**0010 加 next_checkin_date / checkin_interval_days / health(客户关怀)**;**0011 加 `auto_invoice` / `last_invoiced_date`(每期自动开发票,见 §5.1.2)** |
 | `claims` | 员工报销 | markPaid → expense 或 capital_expense;receipt_url 指 Drive |
 | `drive_files` | 用户上传凭证的 Drive 元数据(0009) | 删交易/报销时连带删 Drive 文件 |
 | `check_ins` | 客户关怀记录(0010) | 删订阅时 cascade 删 |
@@ -142,6 +144,27 @@ Outstanding(每股东)= Σshareholder_loan − Σloan_repayment   (股本 capita
 
 > ✅ 之前 backlog 里"Subscription Mark Paid 没走 receipt"的隐患已经修掉了(discount-% 升级时一并处理)。
 
+### 5.1.2 订阅每期自动开发票(`auto_invoice`,0011)
+
+有些客户(学校 / 有报销流程的机构)每期要**正式发票**,不能只发催费邮件。所以订阅可以逐个 opt-in。
+
+- **开关:** 订阅表单里的「每期自动开发票」勾选框 → `subscriptions.auto_invoice`。默认关。
+- **谁来开:** `lib/subscription-invoice.ts` 的 `createCycleInvoice(supabase, sub, today)`。它**不是** `"use server"`,是普通服务端模块,所以 cron(service-role client)和手动 action(用户 client)可以各自传自己的 supabase client 进来 —— 只有一份逻辑。
+- **发票内容:** 一行 line item(`service_desc` × 1)、套用订阅的 `discount_percent`、`due_date = next_charge_date`、`status = "draft"`、带 `subscription_id`。
+- **去重:** `subscriptions.last_invoiced_date === next_charge_date` 就跳过返回 `null`。cron 每天跑但一期只开一张。
+- **cron 触发时机:** 进入提醒窗口(`days <= remind_days_before`)就开。返回 JSON 多了 `invoices_created` 和 `invoice_errors`。
+- **手动触发:** 订阅列表上 `auto_invoice` 的行有个 📄+ 「Generate invoice」按钮 → `generateInvoiceForSubscription()`,同一个 `createCycleInvoice`,已开过就提示"这期开过了"。
+
+> ⚠️ **收款路径唯一性(最重要的一条):**
+> `auto_invoice` 订阅的行**不显示自己的 Mark Paid 按钮** —— 只能通过那张发票收款。
+> 付发票 → `markInvoicePaid` 看到 `subscription_id` → 开 Receipt + 入账 income **并且**把订阅的
+> `next_charge_date` / `last_charged_date` 往后推。
+> 如果两边都能点,这一期会被收两次。改这块 UI 时务必保留这个互斥。
+
+> ⚠️ 另一个踩过的坑:`updateSubscription` 走 `validate()`,漏传的字段会被重置成默认值。
+> 列表上的暂停/恢复按钮(`onToggleStatus`)因此必须把 `discount_percent` 和 `auto_invoice`
+> **原样传回去**,否则一按暂停客户的折扣就没了。加新字段时记得同步这里。
+
 ### 5.1.1 Discount(折扣)语义 — **% 制**
 
 **重要:** discount 是**百分比(0–100)**,不是固定金额。
@@ -167,16 +190,18 @@ olcc-books/
 ├── app/
 │   ├── (app)/                       # 受认证保护的所有页面
 │   │   ├── layout.tsx               # auth gate + 白名单 check
-│   │   ├── dashboard/               # 总览 (stat cards + 图表 + reminder)
+│   │   ├── dashboard/               # 总览 (三栏提醒 + 总资金 hero + 图表)
 │   │   ├── transactions/            # 收支记录 + OCR 扫描入口
 │   │   ├── invoices/                # 开发票 (CRUD + PDF + email + markPaid)
 │   │   ├── receipts/                # 收据 (CRUD + PDF + email,自动从 invoice 级联)
 │   │   ├── recurring/               # 我们付的月费
-│   │   ├── subscriptions/           # 客户付我们的月费 (v2 新)
+│   │   ├── subscriptions/           # 客户付我们的月费 (v2 新,含 auto_invoice)
 │   │   ├── care/                    # 客户关怀 (check-in 提醒 + 记录,0010)
 │   │   ├── eduflow/                 # EduFlow 客户 1 分钟 onboard
 │   │   ├── capital/                 # 资本池只读报表 (0007/0008)
 │   │   ├── claims/                  # 员工报销 (Drive 凭证 + 营运/资本选择)
+│   │   ├── shareholders/            # ⚠️ 只有 actions.ts,没有 page —— 不是路由。
+│   │   │                            #   createShareholder 由交易表单内联调用
 │   │   └── settings/                # 改公司资料/银行/白名单
 │   ├── auth/                        # /auth/login /auth/callback 等
 │   └── api/
@@ -199,6 +224,9 @@ olcc-books/
 │   ├── eduflow-plans.ts             # 3 个 plan 常量
 │   ├── categories.ts                # Transaction / Claim 分类常量
 │   ├── recurring-utils.ts           # 共享日期 + urgency 工具
+│   ├── subscription-invoice.ts      # createCycleInvoice(cron + 手动共用,0011)
+│   ├── drive.ts / drive-cleanup.ts  # Google Drive 上传 + 删行连带清理
+│   ├── upload-receipt.ts / image.ts # 客户端压缩 → POST /api/drive/upload
 │   ├── format.ts                    # 货币 + 日期格式化
 │   ├── types.ts                     # 全部表的 TS 类型
 │   └── i18n.ts                      # zh + en dict
@@ -251,6 +279,8 @@ olcc-books/
 | **报销 Mark-Paid 营运/资本选择** | 默认 expense(Operating Pool),可勾资本性支出 → capital_expense(Capital Pool) | `app/(app)/claims/MarkClaimPaidModal.tsx` + actions |
 | **客户关怀(Customer Care)** | 售后 check-in 提醒页 + 记录弹窗 + Dashboard 卡 + 新订阅自动排首次关怀 | `0010_customer_care.sql` + `app/(app)/care/*` + `lib/queries/care.ts` |
 | **Dashboard 三栏提醒** | To Collect / To Pay / Customers-to-check-in 移到顶部等宽三栏 | `app/(app)/dashboard/DashboardClient.tsx` |
+| **Dashboard 总资金 hero**<br>(2026-07-12, `8a7e88e`) | 老板反映两张大的 Capital/Operating 卡看着乱,他真正在意的是"总数 = 银行余额"。总额改 4xl hero + "= 你的银行余额"说明,两个池缩成下面的小 chip(保留,不隐藏) | `DashboardClient.tsx` + `lib/i18n.ts`(`matchesBank`) |
+| **订阅每期自动开发票**<br>(2026-07-12, `c4548a8`) | 订阅可 opt-in `auto_invoice`;cron 在提醒窗口内自动开当期草稿发票(按 cycle 去重),付这张发票会推进订阅;这类订阅隐藏自己的 Mark Paid 防重复收款。详见 §5.1.2 | `0011_subscription_auto_invoice.sql` + `lib/subscription-invoice.ts` + invoices/subscriptions actions + cron + 订阅表单/列表 |
 
 每个 Phase / patch 的 commit message 在 `git log` 里完整写了背景。
 
@@ -323,7 +353,8 @@ middleware 的 matcher 排除 `api/cron`(也排除 `api/drive`),否则 Supabase 
 | ~~Resend domain verify~~ | ✅ 已做(send.olcctechnology.com 已验证,可真发客户) | — |
 | 客户关怀:**查看历史关怀记录 UI** | check_ins 数据已存,`listCheckIns()` 已有,差界面(点行 → 历史) | **中,做起来快** |
 | 客户关怀:到期发团队提醒邮件 / 流失风险 + MRR 统计 | 没做(Phase 2) | 中 |
-| Subscription 自动 mark paid / Stripe Checkout 自动收款 | 没做 | 客户 20+ 单时考虑 |
+| Subscription 自动 mark paid / Stripe Checkout 自动收款 | 没做。注:0011 的 `auto_invoice` 只自动**开发票**,钱到账仍要人手 Mark Paid | 客户 20+ 单时考虑 |
+| `auto_invoice` 开的是 **draft**,还要手动点 ✉ 发给客户 | 没做(要不要开完自动发?) | 中 |
 | 自动发 receipt 邮件给客户(mark paid 后要手动点 ✉) | 没做 | 中 |
 | 利息自动计算(interest_rate 存了但靠手动录) | 没做 | 中 |
 | 资本性支出超支护栏(Capital Pool 可被花成负) | 没做 | 低 |
@@ -410,7 +441,15 @@ update public.settings set value = '1' where key = 'next_receipt_seq';
 curl.exe -H "Authorization: Bearer <CRON_SECRET>" https://olcc-books.vercel.app/api/cron/daily-reminders
 ```
 
-正常返回 `{"ok":true,...}` JSON。
+正常返回:
+
+```json
+{"ok":true,"at":"...",
+ "subscriptions":{"considered":N,"sent":N,"invoices_created":N,"errors":[],"invoice_errors":[]},
+ "recurring":{"considered":N,...}}
+```
+
+`invoices_created` 是这次跑给 `auto_invoice` 订阅新开的草稿发票数。**重复跑不会重复开**(按 cycle 去重),放心手动测。
 
 ### 12.6 看 Vercel logs
 

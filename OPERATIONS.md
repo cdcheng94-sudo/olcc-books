@@ -153,11 +153,14 @@ Dashboard "To Collect" 卡片,从上往下按到期紧急度排序。
 
 ### 催客户付款
 
-`/subscriptions` → 找到那行 → 右边 4 个图标:
+`/subscriptions` → 找到那行 → 右边的图标:
 - 💬 WhatsApp:点击直接打开 wa.me/客户电话?text=预填消息
 - ✉ Email:点击打开 mailto: 链接,带预填正文
 - ✓ Mark Paid:客户付了之后点,自动入账 income
+- 📄+ Generate invoice:**只有开了「每期自动开发票」的客户才有这个**(见下)
 - ⏸ Pause:客户暂停服务时用
+
+> 同一行上 **✓ Mark Paid 和 📄+ 只会出现一个**,不会两个都有。这是故意的 —— 见下面「两种收款方式」。
 
 ### 新增订阅时设折扣
 
@@ -166,12 +169,38 @@ Dashboard "To Collect" 卡片,从上往下按到期紧急度排序。
 - **折扣 (%,每期自动扣)**:给这个客户的长期优惠,填了之后下面会实时显示 **原价 → −X% → 每期实收**
 - 之后**每个月**催费、收款、PDF 收据都自动按这个折扣算,不用每月手动改
 
-### 客户付了款
+### 🆕 两种收款方式:普通 vs「每期自动开发票」
+
+订阅表单最下面有个勾选框 **「每期自动开发票 / auto-create invoice each cycle」**。勾不勾决定这个客户怎么收款:
+
+| | **不勾**(默认,大部分客户) | **勾了** |
+|---|---|---|
+| 什么客户用 | 一般补习中心 —— 收到催费邮件就转账 | 学校 / 有报销流程的机构 —— 每期要一张**正式发票**去报账 |
+| 到期前系统做什么 | 发催费邮件 | 发催费邮件 **+ 自动在 `/invoices` 开一张当期发票**(草稿) |
+| 你怎么收款 | 订阅那行点 **✓ Mark Paid** | 去 **`/invoices`** 把那张发票 Mark Paid |
+| 收完的结果 | 一样:开 RCP 收据 + 入账 income + 下次扣款日推后 | 一样:开 RCP 收据 + 入账 income + 下次扣款日推后 |
+
+**❗ 最重要的一条:勾了自动开发票的客户,订阅那行的 ✓ Mark Paid 会消失。** 不是 bug —— 这类客户**只能从发票收款**。两边都能点的话同一个月会被收两次钱,账就错了。
+
+**怎么改一个已有客户:** 那行 ✏ → 勾上/取消那个框 → Save。
+
+**其他要知道的:**
+- 自动开的发票是 **Draft(草稿)**,不会自动发出去。你要去 `/invoices` 点 ✉ 才发给客户 —— 故意的,让你先看一眼金额对不对。
+- 发票内容 = 订阅的服务名 × 1 + 折扣 %,到期日 = 订阅的扣款日。
+- **一期只开一张**,系统每天跑也不会重复开。
+- 不想等系统开?那行点 **📄+** 立刻开当期发票。已经开过会提示「这期开过了」。
+
+### 客户付了款(普通订阅)
 
 那行点 ✓ (Mark Paid)
 - 自动按折后金额入账 income(category = Service Income)
 - **自动生成一张 RCP-XXXX 收据 + PDF**(客户可邮,PDF 显示原价 + 折扣 + 实付)
-- next_charge_date 推后 1 月
+- 下次扣款日按该订阅的周期往后推(月缴 +1 月 / 季缴 +3 月 / 年缴 +1 年)
+
+### 客户付了款(自动开发票的订阅)
+
+去 `/invoices` 找那张发票 → ✓ Mark Paid(流程跟 §1「客户转账后怎么入账」完全一样,可以填实际收款日 + 上传转账截图)。
+除了开收据 + 入账,系统**还会顺手把这张订阅的下次扣款日按周期推后**(月缴 +1 月 / 季缴 +3 月 / 年缴 +1 年)—— 你不用回 `/subscriptions` 再做什么。
 
 ---
 
@@ -250,11 +279,13 @@ Dashboard "To Collect" 卡片,从上往下按到期紧急度排序。
 - 6 个 tab:股东借款 / 资本注入 / 还款 / 资本性支出 / 利息 / **按股东汇总**
 - "按股东汇总"一眼看每个股东:借了多少 / 股本多少 / 还了多少 / 还欠多少
 
-### Dashboard 顶部「公司可用资金」
+### Dashboard 的「公司可用资金」
 
-- **Capital Pool(资本池):** 股东的钱(借款 + 股本 − 资本支出 − 还款)
-- **Operating Pool(经营池):** 做生意赚的(收入 − 支出 − 利息)
-- 下面「本月 Income/Expense/Net」三卡是**纯经营**(标了 "Operating only"),不含资本往来
+- **大字的总额** = 公司现在总共有多少钱,**应该对得上银行余额**。日常看这个就够。
+- 下面两个小格子是这笔钱**从哪来**的拆分:
+  - **Capital Pool(资本池):** 股东的钱(借款 + 股本 − 资本支出 − 还款)
+  - **Operating Pool(经营池):** 做生意赚的(收入 − 支出 − 利息)
+- 再下面「本月 Income/Expense/Net」三卡是**纯经营**(标了 "Operating only"),不含资本往来
 
 ---
 
@@ -283,7 +314,9 @@ Dashboard "To Collect" 卡片,从上往下按到期紧急度排序。
   - **To Pay:** 我们要付的定期支出
   - **Customers to check in:** 该做售后关怀的客户(见 §4b)
   - 彩条:深红 = 已逾期 · 红 = 3 天内 · 黄 = 7 天内 · 绿 = 还宽松
-- **公司可用资金:** Capital Pool / Operating Pool / 总额(见 §5b)
+- **公司可用资金(大字那个数):** 就是**公司现在总共有多少钱,应该对得上银行余额**。
+  下面两个小格子是这笔钱的来源拆分 —— Capital Pool(股东的钱)+ Operating Pool(生意赚的),
+  平时不用管,想细看再看(见 §5b)。
 - **3 个 stat cards:** 本月 Income / Expense / Net(纯营运)
 - **6-Month Trend:** 收支柱图,绿 income + 红 expense
 - **Expense by Category:** 本月支出 donut + 分类百分比
@@ -310,6 +343,7 @@ Dashboard "To Collect" 卡片,从上往下按到期紧急度排序。
 
 - **每天 09:00 (MYT)** Vercel 自动扫:
   - 哪些 Subscriptions 到提醒里程碑 → 自动邮件催客户。**按节点发,不刷屏**:到期前 `remind_days_before`(默认 7)天、3 天、当天各一封。
+  - 哪些 **开了「每期自动开发票」的 Subscriptions** 进了提醒窗口 → 在 `/invoices` **自动开一张当期草稿发票**(见 §4)。一期只开一张,你隔天看到的不会是一堆重复的。
   - 哪些 Recurring 到提醒窗口 → 合并成 1 封 digest 发到公司 email(Settings 里的 Contact email,目前 `developer@olcctechnology.com`)。
 
 邮件从公司域名 **`noreply@send.olcctechnology.com`** 发出(已验证,可真发客户),客户回复会进 **`developer@olcctechnology.com`**。你**不用做任何事**,自动跑。
@@ -343,7 +377,12 @@ PowerShell 手动跑这条看返回值(把 token 替换成你的 CRON_SECRET):
 ```
 curl.exe -H "Authorization: Bearer <CRON_SECRET>" https://olcc-books.vercel.app/api/cron/daily-reminders
 ```
-正常返回:`{"ok":true, "subscriptions":{"considered":N,...}, ...}`
+正常返回:`{"ok":true, "subscriptions":{"considered":N, "sent":N, "invoices_created":N, ...}, ...}`
+
+(`invoices_created` = 这次给「自动开发票」的订阅新开了几张。多跑几次不会重复开,放心测。)
+
+### "订阅那行的 ✓ Mark Paid 不见了"
+那个客户开了「每期自动开发票」。**去 `/invoices` 付那张发票**就行,系统会顺带推进订阅。见 §4。
 
 ### "想看具体某天/某月报表"
 还没建,在 backlog。现在可以用 `/transactions` 筛选 + Dashboard 看。

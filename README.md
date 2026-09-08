@@ -32,7 +32,7 @@ npm install
 
 # 3. Run database migrations against Supabase
 #    Supabase Dashboard → SQL Editor → run each file under supabase/migrations/
-#    in order (0001 → … → 0010) and click Run.
+#    in order (0001 → … → 0011) and click Run.
 
 # 4. Configure Google OAuth in Supabase
 #    Authentication → Providers → Google → enable + Client ID/Secret.
@@ -51,16 +51,19 @@ Open http://localhost:3000 and sign in with a Google account whose email is in
 app/
 ├── (app)/                  # Authenticated app shell (sidebar + topbar)
 │   ├── layout.tsx          # Shell + whitelist gate
-│   ├── dashboard/          # Stat cards, charts, 3-col reminder grid
+│   ├── dashboard/          # 3-col reminder grid, total-funds hero, charts
 │   ├── transactions/       # Ledger (7 types) + OCR scan + Drive receipt upload
 │   ├── invoices/           # CRUD + PDF + email + Mark-Paid dialog
 │   ├── receipts/           # Auto (from invoice/subscription) + manual
 │   ├── recurring/          # Vendor payments we owe
-│   ├── subscriptions/      # Customer monthly billing (+ persistent % discount)
-│   ├── care/               # ← new: Customer Care (after-sales check-ins)
+│   ├── subscriptions/      # Customer billing (+ persistent % discount,
+│   │                       #   optional auto-invoice per cycle)
+│   ├── care/               # Customer Care (after-sales check-ins)
 │   ├── eduflow/            # 1-minute EduFlow customer onboarding
 │   ├── capital/            # Capital vs Operating fund pools (read-only report)
 │   ├── claims/             # Employee reimbursement workflow
+│   ├── shareholders/       # actions.ts only — no page; createShareholder is
+│   │                       #   called inline from the transaction form
 │   └── settings/           # Company info, banking, numbering, whitelist
 ├── auth/                   # login / callback / logout / error
 ├── api/
@@ -82,11 +85,12 @@ lib/
 ├── numbering.ts            # INV-XXXX / RCP-XXXX
 ├── categories.ts           # transaction / claim / capital / check-in constants
 ├── recurring-utils.ts      # date math, urgency, reminder milestones
+├── subscription-invoice.ts # createCycleInvoice() — shared by cron + manual action
 ├── eduflow-plans.ts        # 3 plan constants
 ├── types.ts                # DB row types
 └── i18n.ts                 # zh/en dictionary
 
-supabase/migrations/        # 0001_init … 0010_customer_care
+supabase/migrations/        # 0001_init … 0011_subscription_auto_invoice
 middleware.ts               # auth redirect (excludes api/cron, api/drive, assets)
 vercel.json                 # Cron config
 ```
@@ -96,6 +100,10 @@ vercel.json                 # Cron config
 - **Only a Receipt creates an income Transaction.** Marking an invoice or
   subscription paid creates a Receipt, which cascades into one income
   Transaction. Prevents double-counting.
+- **An `auto_invoice` subscription is collected through its invoice, never
+  through the subscription's own Mark Paid.** The UI hides Mark Paid for those
+  rows for exactly this reason; paying the cycle invoice advances the
+  subscription. Doing both would bill the cycle twice.
 - **Marking Recurring/Claim paid writes a real expense Transaction.** Claims
   can optionally cascade a `capital_expense` (Capital Pool) instead.
 - **Capital vs Operating pools must stay separate** (tax correctness):

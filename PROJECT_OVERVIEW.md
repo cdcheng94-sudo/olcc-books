@@ -3,7 +3,7 @@
 > 这是一份**自包含**的项目现状快照,方便拿去任何地方讨论(包括拿去跟 AI 聊"要不要改造整个系统")。
 > 涵盖:这是什么、技术栈、所有功能模块的当前行为、EduFlow 定价 + 折扣逻辑、资本池、Drive 集成、客户关怀、已完成、待讨论的开放问题。
 >
-> **最后更新:** 2026-06-18
+> **最后更新:** 2026-09-08(最后一次功能提交 2026-07-12)
 
 ---
 
@@ -44,7 +44,8 @@
   - **To Collect**(客户要付我们的,逾期/紧急排前)
   - **To Pay**(我们要付的定期支出)
   - **Customers to check in**(该做售后关怀的客户)
-- 资金池卡:Capital Pool / Operating Pool / 总可用资金(见 §6)
+- **公司可用资金卡:总额是主角** —— 大字显示 `Capital + Operating` 的总和,下面一行小字「= 你的银行余额」;
+  Capital Pool / Operating Pool 缩成下方两个小 chip(保留可查,但不再抢视线)。见 §6
 - 本月 Income / Expense / Net 三张卡(仅营运/P&L)
 - 近 6 月收支柱状图、本月支出分类饼图、最近 8 笔交易
 
@@ -61,6 +62,8 @@
 - **Mark Paid 弹窗**:选付款方式、**收款日期**(可填实际收款日,不一定今天)、**可上传客户付款凭证**(转账截图 → Drive,挂到那笔收入交易上)
 - Mark Paid → **自动级联** 开 Receipt + 入账 income
 - 支持**折扣(%)** — 见 §4
+- **也可能是订阅自动生成的**(见 §3.6):这类发票带 `subscription_id`,付它的时候除了开收据入账,
+  还会把那张订阅的下次扣款日往后推
 
 ### 3.4 Receipts(收据)
 - 自动从 invoice / subscription Mark Paid 产生,或手动开(现金销售)
@@ -77,6 +80,19 @@
 - WhatsApp / Email 一键催费(预填消息)
 - Mark Paid → **经 Receipt 级联** → 客户拿到 PDF 收据 + 入账 income + 到期日推后
 - **催费邮件按里程碑发**(不再天天发):到期前 `remind_days_before` 天、3 天、当天各一封,见 §8
+- **每期自动开发票(可选,逐个客户开关):** 见下
+
+#### 两种收款模式 —— 一个订阅只能是其中一种
+
+| | 默认(不勾 auto-invoice) | 勾了「每期自动开发票」 |
+|---|---|---|
+| 适合 | 一般补习中心,收催费邮件就转账 | 学校 / 有报销流程的机构,每期要**正式发票** |
+| 到期时 | 只发催费邮件 | cron 在提醒窗口内**自动开一张当期草稿发票**(带折扣、到期日 = 扣款日),同时照发催费邮件 |
+| 怎么收款 | 订阅那行点 **✓ Mark Paid** | 去 `/invoices` 付**那张发票**;订阅行的 Mark Paid **被隐藏** |
+| 结果 | Receipt + income + 扣款日推后 | Receipt + income + 扣款日推后(完全一样) |
+
+> 🔑 **为什么隐藏 Mark Paid:** 两个入口都能点的话,同一期会被收两次。所以"开了自动发票的订阅,只从发票收款"。
+> 每期只开一张(按 cycle 去重,cron 每天跑也不会重复)。想提前开可以手动点那行的 📄+ 按钮。
 
 ### 3.7 Customer Care(客户关怀)— **v2 最新模块,见 §9**
 - 提醒团队**主动关心**订阅客户,降低流失
@@ -99,6 +115,7 @@
 
 ### 自动化(每天 09:00 马来时间,Vercel Cron)
 - 扫到期的 Subscriptions → **按里程碑**邮件催客户(7/3/当天)
+- 勾了 auto-invoice 的 Subscriptions 进入提醒窗口 → **自动开当期草稿发票**(每期一张,不重复)
 - 扫到期的 Recurring → 合并 digest 邮件提醒内部(发到公司 email)
 
 ---
@@ -212,6 +229,11 @@ Operating Pool = 收入 − 支出 − 付利息
   Subscription ──Mark Paid──▶ Receipt ──▶ income transaction
   手动 Receipt ───────────────▶ income transaction
 
+  订阅(勾了 auto-invoice)走的是发票那条:
+  Subscription ──cron 自动开──▶ Invoice ──Mark Paid──▶ Receipt ──▶ income transaction
+                                             └──▶ 同时推进订阅的下次扣款日
+  (这类订阅的 Mark Paid 按钮被隐藏,确保一期只收一次)
+
 支出(expense):
   手动 Transaction(可 OCR)
   Recurring ──Mark Paid──▶ expense transaction
@@ -234,6 +256,8 @@ Operating Pool = 收入 − 支出 − 付利息
 - ✅ 发票 Mark Paid 弹窗(收款日期 + 付款凭证);报销 Mark Paid(营运/资本选择)
 - ✅ 订阅催费里程碑制(不刷屏)
 - ✅ **客户关怀系统**(关怀提醒 + 健康度 + 反馈记录)
+- ✅ **订阅每期自动开发票**(可选,给要正式发票的机构客户;付发票即推进订阅)
+- ✅ Dashboard 总资金 hero(总额 = 银行余额;两个池缩成小 chip)
 - ✅ PDF 生成 + 邮件发送、OCR 拍收据、每日 Cron、PWA 桌面图标
 - ✅ Vercel 自动部署 + GitHub 备份
 
@@ -248,8 +272,9 @@ Operating Pool = 收入 − 支出 − 付利息
 | **EduFlow 客户健康 / MRR 趋势** | 只有单客户健康度,无整体统计 | 流失率、MRR、即将到期总览 |
 | **利息自动计算** | interest_rate 字段存了但不算,靠手动录 | 要不要按借款利率 + 期间自动算应付利息? |
 | **资本性支出护栏** | 没限制(Capital Pool 可被花成负) | 要不要加"别超支"提醒? |
-| **Subscription 自动收款** | 到期手动点 Mark Paid(客户真转账后才点) | 要不要接 Stripe?门槛:Stripe MY 商户号 + EduFlow 网站 Checkout |
+| **Subscription 自动收款** | 到期手动点 Mark Paid(客户真转账后才点)。auto-invoice 只自动**开票**,收钱仍靠人手确认 | 要不要接 Stripe?门槛:Stripe MY 商户号 + EduFlow 网站 Checkout |
 | **自动发 receipt 邮件** | Mark Paid 生成 receipt 但要手动点 ✉ 才发 | 要不要 Mark Paid 后自动邮收据? |
+| **自动发 invoice 邮件** | auto-invoice 开出来是 **draft**,还要人去 `/invoices` 点 ✉ | 要不要开完直接发?(风险:金额错了已经发出去了) |
 | **月度/年度 P&L 报表** | 没做 | 会计需要 |
 | **数据导出 CSV/Excel** | 没做 | 给会计师 |
 | **操作日志 audit log** | 没做 | 合规 / 多人协作追溯 |
@@ -262,5 +287,5 @@ Operating Pool = 收入 − 支出 − 付利息
 ## 13. 想改/加功能怎么做
 
 代码在 GitHub,改完 `git push` → Vercel ~2 分钟自动上线(失败的部署不会影响线上,仍跑旧版)。
-Schema 改动有对应的 `supabase/migrations/*.sql`(最新到 `0010`),在 Supabase SQL Editor 手动跑。
-详细开发/运维流程见 `HANDOVER.md` 与 `OPERATIONS.md`(注:这两份部分内容比本快照旧)。
+Schema 改动有对应的 `supabase/migrations/*.sql`(最新到 `0011_subscription_auto_invoice`),在 Supabase SQL Editor 手动跑。
+详细开发/运维流程见 `HANDOVER.md`(开发/维护)与 `OPERATIONS.md`(日常操作)—— 三份文档在 2026-09-08 一起对齐过。
