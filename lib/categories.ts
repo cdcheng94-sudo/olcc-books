@@ -12,6 +12,11 @@ export const CATEGORIES = {
     "Sales Income",
     "Service Income",
     "Other Income",
+    // Self-serve app revenue, recorded per settlement batch (not per end-user).
+    // Attribution comes from the bank description: Billplz -> quiz app,
+    // DuitNow QR -> wish app. See OPERATIONS.md.
+    "Quiz App Revenue",
+    "Wish App Revenue",
   ],
   expense: [
     "Salary",
@@ -22,6 +27,8 @@ export const CATEGORIES = {
     "Office Supplies",
     "Software Subscription",
     "Other Expense",
+    // Billplz / QR acquirer / app-store cuts taken out of gross collections.
+    "Payment Gateway Fees",
   ],
 } as const;
 
