@@ -83,12 +83,12 @@ export function DashboardClient({ summary, toPay, toCollect, careDue, trend, byC
                   return (
                     <div key={s.id} className="flex bg-card border border-border rounded-md overflow-hidden shadow-sm">
                       <div className={`w-1.5 ${u.bar}`} />
-                      <div className="flex-1 px-3 py-2.5 flex justify-between items-center">
+                      <div className="flex-1 min-w-0 px-3 py-2.5 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                         <div className="min-w-0">
-                          <div className="font-semibold text-sm truncate">{s.customer_name}</div>
+                          <div className="font-semibold text-sm break-words">{s.customer_name}</div>
                           <div className="text-xs text-muted-foreground truncate">{s.service_desc}</div>
                         </div>
-                        <div className="text-right shrink-0 ml-3">
+                        <div className="flex items-baseline justify-between gap-2 shrink-0 sm:block sm:text-right">
                           <div className="font-bold text-sm tabular-nums">{fmtMoney(+(s.amount * (1 - (s.discount_percent || 0) / 100)).toFixed(2))}</div>
                           <div className={`text-[11px] font-semibold ${u.text}`}>{localizedDaysLabel(s.days_until_due, t)}</div>
                         </div>
@@ -124,12 +124,12 @@ export function DashboardClient({ summary, toPay, toCollect, careDue, trend, byC
                   return (
                     <div key={r.id} className="flex bg-card border border-border rounded-md overflow-hidden shadow-sm">
                       <div className={`w-1.5 ${u.bar}`} />
-                      <div className="flex-1 px-3 py-2.5 flex justify-between items-center">
+                      <div className="flex-1 min-w-0 px-3 py-2.5 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                         <div className="min-w-0">
-                          <div className="font-semibold text-sm truncate">{r.name}</div>
+                          <div className="font-semibold text-sm break-words">{r.name}</div>
                           <div className="text-xs text-muted-foreground truncate">{r.payee || fmtDate(r.next_due_date)}</div>
                         </div>
-                        <div className="text-right shrink-0 ml-3">
+                        <div className="flex items-baseline justify-between gap-2 shrink-0 sm:block sm:text-right">
                           <div className="font-bold text-sm tabular-nums">{fmtMoney(r.amount)}</div>
                           <div className={`text-[11px] font-semibold ${u.text}`}>{localizedDaysLabel(r.days_until_due, t)}</div>
                         </div>
@@ -165,12 +165,12 @@ export function DashboardClient({ summary, toPay, toCollect, careDue, trend, byC
                   return (
                     <Link key={c.id} href="/care" className="flex bg-card border border-border rounded-md overflow-hidden shadow-sm hover:border-gold">
                       <div className={`w-1.5 ${u ? u.bar : "bg-warning"}`} />
-                      <div className="flex-1 px-3 py-2.5 flex justify-between items-center min-w-0">
+                      <div className="flex-1 min-w-0 px-3 py-2.5 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                         <div className="min-w-0">
-                          <div className="font-semibold text-sm truncate">{c.customer_name}</div>
+                          <div className="font-semibold text-sm break-words">{c.customer_name}</div>
                           <div className="text-xs text-muted-foreground truncate">{c.service_desc}</div>
                         </div>
-                        <div className={`text-[11px] font-semibold shrink-0 ml-3 ${u ? u.text : "text-warning"}`}>
+                        <div className={`text-[11px] font-semibold shrink-0 ${u ? u.text : "text-warning"}`}>
                           {c.days_until_checkin != null ? localizedDaysLabel(c.days_until_checkin, t) : ""}
                         </div>
                       </div>
