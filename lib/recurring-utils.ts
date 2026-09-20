@@ -4,6 +4,8 @@
  * one source of truth instead of two.
  */
 
+import { fmtDate } from "@/lib/format";
+
 export type Frequency = "monthly" | "quarterly" | "yearly";
 export type Urgency = "comfortable" | "caution" | "urgent" | "overdue";
 
@@ -76,6 +78,22 @@ export function addDays(isoDate: string, n: number): string {
   const m = d.getMonth() + 1;
   const day = d.getDate();
   return `${y}-${m < 10 ? "0" + m : m}-${day < 10 ? "0" + day : day}`;
+}
+
+/**
+ * The service period one billing cycle buys: the charge date through the day
+ * before the next charge. Printed on the invoice + receipt line so the customer
+ * can see WHICH month (or year) the money is for — on a yearly bill the amount
+ * alone tells them nothing.
+ */
+export function billingPeriod(chargeDate: string, freq: Frequency): { start: string; end: string } {
+  return { start: chargeDate, end: addDays(advanceDate(chargeDate, freq), -1) };
+}
+
+/** Human label for one cycle, e.g. "15-Sep-2026 - 14-Oct-2026". */
+export function billingPeriodLabel(chargeDate: string, freq: Frequency): string {
+  const { start, end } = billingPeriod(chargeDate, freq);
+  return `${fmtDate(start)} – ${fmtDate(end)}`;
 }
 
 /** Push a date forward by the given frequency, returning a fresh ISO date. */

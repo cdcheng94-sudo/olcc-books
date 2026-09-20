@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SubscriptionRow, InvoiceRow, LineItem } from "@/lib/types";
 import { nextDocumentNumber } from "@/lib/numbering";
+import { billingPeriodLabel, type Frequency } from "@/lib/recurring-utils";
 
 /**
  * Create a draft invoice for a subscription's current billing cycle.
@@ -28,7 +29,9 @@ export async function createCycleInvoice(
   const subtotal = +unit.toFixed(2);
   const discountPct = +(sub.discount_percent || 0).toFixed(2);
   const total = +(subtotal - subtotal * discountPct / 100).toFixed(2);
-  const items: LineItem[] = [{ desc: sub.service_desc, qty: 1, unit_price: unit, amount: subtotal }];
+  // Stamp the cycle this invoice bills so the customer knows what they are paying for.
+  const period = billingPeriodLabel(sub.next_charge_date, sub.frequency as Frequency);
+  const items: LineItem[] = [{ desc: sub.service_desc, qty: 1, unit_price: unit, amount: subtotal, period }];
 
   const number = await nextDocumentNumber(supabase, "invoice");
 
@@ -48,7 +51,7 @@ export async function createCycleInvoice(
       tax:              0,
       total,
       status:           "draft",
-      note:             null,
+      note:             `Service period: ${period}`,
       subscription_id:  sub.id,
     })
     .select()

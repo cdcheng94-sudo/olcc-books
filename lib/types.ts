@@ -56,6 +56,7 @@ export type LineItem = {
   amount: number;            // net line amount
   original_unit_price?: number;  // pre-discount, shown struck-through when set
   discount_percent?: number;     // shown in red when set
+  period?: string;               // service period this line covers, e.g. "15-Sep-2026 - 14-Oct-2026"
 };
 
 export type InvoiceRow = {

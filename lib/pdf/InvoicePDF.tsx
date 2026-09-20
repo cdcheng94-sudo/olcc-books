@@ -149,6 +149,9 @@ export function InvoicePDF({ invoice, settings }: { invoice: InvoiceRow; setting
               <Text style={styles.tdIdx}>{i + 1}</Text>
               <View style={styles.tdDesc}>
                 <Text>{it.desc}</Text>
+                {it.period ? (
+                  <Text style={{ fontSize: 7, color: MUTED, marginTop: 1 }}>{it.period}</Text>
+                ) : null}
                 {it.discount_percent ? (
                   <Text style={{ fontSize: 7, color: DANGER, marginTop: 1, fontWeight: 700 }}>
                     {it.discount_percent}% OFF{"  "}

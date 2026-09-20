@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { advanceDate, addDays, FREQUENCIES, type Frequency } from "@/lib/recurring-utils";
+import { advanceDate, addDays, billingPeriodLabel, FREQUENCIES, type Frequency } from "@/lib/recurring-utils";
 import { todayIso } from "@/lib/format";
 import { createReceipt } from "../receipts/actions";
 import { createCycleInvoice } from "@/lib/subscription-invoice";
@@ -139,6 +139,7 @@ export async function markSubscriptionPaid(id: string) {
       qty:        1,
       unit_price: sub.amount,
       amount:     sub.amount,
+      period:     billingPeriodLabel(sub.next_charge_date, sub.frequency),
     }],
     discount_percent: sub.discount_percent ?? 0,
     tax:              0,
