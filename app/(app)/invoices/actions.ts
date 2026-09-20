@@ -101,6 +101,12 @@ export async function createInvoice(input: InvoiceInput): Promise<InvoiceRow> {
 export async function updateInvoice(id: string, input: InvoiceInput): Promise<InvoiceRow> {
   validate(input);
   const supabase = await createClient();
+
+  // A voided invoice is a historical record — editing it would rewrite what
+  // the customer was actually billed. Reissue a new one instead.
+  const { data: current } = await supabase.from("invoices").select("status").eq("id", id).maybeSingle();
+  if (current?.status === "cancelled") throw new Error("This invoice was cancelled — create a new one instead of editing it.");
+
   const totals = computeTotals(input.items, input.discount_percent ?? 0, input.tax);
 
   const { data, error } = await supabase
@@ -133,6 +139,47 @@ export async function deleteInvoice(id: string) {
   if (error) throw new Error(error.message);
   revalidatePath("/invoices");
   return { ok: true };
+}
+
+/**
+ * Void an invoice, keeping its number and the reason on record.
+ *
+ * Preferred over deleteInvoice for anything already issued: the customer holds
+ * that PDF, and a deleted row leaves an unexplained gap in the INV-xxxx run.
+ *
+ * A paid invoice is refused — it owns a receipt and an income transaction, so
+ * voiding it would leave real money with nothing behind it. Delete the receipt
+ * first if a payment truly needs unwinding.
+ *
+ * If the invoice billed a subscription cycle, its `last_invoiced_date` stamp is
+ * cleared so a corrected invoice can be issued for that same cycle — otherwise
+ * the dedup in createCycleInvoice would treat the cycle as already billed and
+ * silently never reissue it.
+ */
+export async function cancelInvoice(id: string, reason: string): Promise<InvoiceRow> {
+  const supabase = await createClient();
+  const { data: invoice, error } = await supabase.from("invoices").select("*").eq("id", id).single();
+  if (error) throw new Error(error.message);
+  const inv = invoice as InvoiceRow;
+
+  if (inv.status === "paid")      throw new Error("A paid invoice cannot be cancelled — delete its receipt first if the payment must be unwound.");
+  if (inv.status === "cancelled") throw new Error("This invoice is already cancelled.");
+
+  const { data, error: upErr } = await supabase
+    .from("invoices")
+    .update({ status: "cancelled", cancelled_at: new Date().toISOString(), cancel_reason: reason.trim() || null })
+    .eq("id", id)
+    .select()
+    .single();
+  if (upErr) throw new Error(upErr.message);
+
+  if (inv.subscription_id) {
+    await supabase.from("subscriptions").update({ last_invoiced_date: null }).eq("id", inv.subscription_id);
+    revalidatePath("/subscriptions");
+  }
+
+  revalidatePath("/invoices");
+  return data as InvoiceRow;
 }
 
 export async function setInvoiceStatus(id: string, status: InvoiceStatus): Promise<InvoiceRow> {
@@ -184,6 +231,7 @@ export async function sendInvoiceByEmail(id: string): Promise<{ ok: true }> {
   if (error) throw new Error(error.message);
   const inv = invoice as InvoiceRow;
 
+  if (inv.status === "cancelled") throw new Error("This invoice was cancelled — it cannot be sent.");
   if (!inv.customer_email) throw new Error("Customer has no email — add one before sending.");
 
   // Always (re-)render so the PDF reflects current invoice content
@@ -220,6 +268,7 @@ export async function markInvoicePaid(id: string, paymentMethod: string = "Bank 
   const inv = invoice as InvoiceRow;
 
   if (inv.status === "paid") throw new Error("Invoice is already paid.");
+  if (inv.status === "cancelled") throw new Error("This invoice was cancelled — it cannot be marked paid.");
 
   // Payment date defaults to today, but the caller can pass the actual date
   // the customer paid (so the receipt + income transaction are dated right).

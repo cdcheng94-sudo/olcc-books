@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useMemo } from "react";
-import { Plus, FileDown, Send, CheckCircle2, Pencil, Trash2 } from "lucide-react";
+import { Plus, FileDown, Send, CheckCircle2, Pencil, Trash2, Ban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useLang } from "@/components/LangProvider";
@@ -10,6 +10,7 @@ import { fmtDate, fmtMoney } from "@/lib/format";
 import { daysUntilDue } from "@/lib/recurring-utils";
 import type { InvoiceRow, InvoiceStatus } from "@/lib/types";
 import {
+  cancelInvoice,
   deleteInvoice,
   getInvoiceDownloadUrl,
   sendInvoiceByEmail,
@@ -20,9 +21,10 @@ import { MarkPaidModal } from "./MarkPaidModal";
 type Filter = InvoiceStatus | "all";
 
 const STATUS_BADGE: Record<InvoiceStatus, string> = {
-  draft: "bg-muted text-muted-foreground",
-  sent:  "bg-warning-soft text-warning",
-  paid:  "bg-success-soft text-success",
+  draft:     "bg-muted text-muted-foreground",
+  sent:      "bg-warning-soft text-warning",
+  paid:      "bg-success-soft text-success",
+  cancelled: "bg-danger-soft text-danger",
 };
 
 export function InvoicesClient({ initialRows }: { initialRows: InvoiceRow[] }) {
@@ -42,22 +44,25 @@ export function InvoicesClient({ initialRows }: { initialRows: InvoiceRow[] }) {
 
   const counts = useMemo(() => ({
     all:    rows.length,
-    draft:  rows.filter((r) => r.status === "draft").length,
-    sent:   rows.filter((r) => r.status === "sent").length,
-    paid:   rows.filter((r) => r.status === "paid").length,
+    draft:     rows.filter((r) => r.status === "draft").length,
+    sent:      rows.filter((r) => r.status === "sent").length,
+    paid:      rows.filter((r) => r.status === "paid").length,
+    cancelled: rows.filter((r) => r.status === "cancelled").length,
   }), [rows]);
 
   const filterLabel: Record<Filter, string> = {
-    all:   t.invoice.filterAll,
-    draft: t.invoice.filterDraft,
-    sent:  t.invoice.filterSent,
-    paid:  t.invoice.filterPaid,
+    all:       t.invoice.filterAll,
+    draft:     t.invoice.filterDraft,
+    sent:      t.invoice.filterSent,
+    paid:      t.invoice.filterPaid,
+    cancelled: t.invoice.filterCancelled,
   };
 
   const statusLabel: Record<InvoiceStatus, string> = {
-    draft: t.status.draft,
-    sent:  t.status.sent,
-    paid:  t.status.paid,
+    draft:     t.status.draft,
+    sent:      t.status.sent,
+    paid:      t.status.paid,
+    cancelled: t.status.cancelled,
   };
 
   function openNew()  { setEditing(null); setModalOpen(true); }
@@ -82,6 +87,18 @@ export function InvoicesClient({ initialRows }: { initialRows: InvoiceRow[] }) {
         await deleteInvoice(row.id);
         setRows((prev) => prev.filter((r) => r.id !== row.id));
       } catch (e) { alert(t.errors.deleteFailed + (e as Error).message); }
+    });
+  }
+
+  function onCancel(row: InvoiceRow) {
+    const reason = prompt(interp(t.invoice.cancelPrompt, { number: row.invoice_number }));
+    if (reason === null) return;                     // dismissed
+    startTransition(async () => {
+      try {
+        const saved = await cancelInvoice(row.id, reason);
+        setRows((prev) => prev.map((r) => r.id === saved.id ? saved : r));
+        alert(interp(t.invoice.cancelOk, { number: row.invoice_number }));
+      } catch (e) { alert(t.errors.failed + (e as Error).message); }
     });
   }
 
@@ -119,7 +136,7 @@ export function InvoicesClient({ initialRows }: { initialRows: InvoiceRow[] }) {
     <div>
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div className="flex items-center gap-1.5 flex-wrap">
-          {(["all","draft","sent","paid"] as Filter[]).map((f) => (
+          {(["all","draft","sent","paid","cancelled"] as Filter[]).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -157,10 +174,15 @@ export function InvoicesClient({ initialRows }: { initialRows: InvoiceRow[] }) {
               <tr><td colSpan={6} className="text-center text-muted-foreground italic py-12">{t.common.empty}</td></tr>
             ) : visibleRows.map((r) => {
               const days = daysUntilDue(r.due_date);
-              const overdue = r.status !== "paid" && days < 0;
+              const overdue = r.status !== "paid" && r.status !== "cancelled" && days < 0;
               return (
-                <tr key={r.id} className="border-t border-border hover:bg-muted/20">
-                  <td className="px-4 py-3 font-mono font-medium">{r.invoice_number}</td>
+                <tr key={r.id} className={"border-t border-border hover:bg-muted/20" + (r.status === "cancelled" ? " opacity-60" : "")}>
+                  <td className="px-4 py-3 font-mono font-medium">
+                    <span className={r.status === "cancelled" ? "line-through" : ""}>{r.invoice_number}</span>
+                    {r.status === "cancelled" && r.cancel_reason && (
+                      <div className="text-[11px] font-sans not-italic text-muted-foreground mt-0.5 max-w-[170px] break-words">{r.cancel_reason}</div>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="font-medium">{r.customer_name}</div>
                     {r.customer_email && <div className="text-xs text-muted-foreground">{r.customer_email}</div>}
@@ -180,19 +202,26 @@ export function InvoicesClient({ initialRows }: { initialRows: InvoiceRow[] }) {
                       <button onClick={() => onDownload(r)} disabled={isPending} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-navy" title={t.invoice.tipDownloadPdf}>
                         <FileDown className="w-4 h-4" />
                       </button>
-                      {r.status !== "paid" && r.customer_email && (
+                      {r.status !== "paid" && r.status !== "cancelled" && r.customer_email && (
                         <button onClick={() => onSendEmail(r)} disabled={isPending} className="p-1.5 hover:bg-warning-soft rounded text-muted-foreground hover:text-warning" title={t.invoice.tipSendEmail}>
                           <Send className="w-4 h-4" />
                         </button>
                       )}
-                      {r.status !== "paid" && (
+                      {r.status !== "paid" && r.status !== "cancelled" && (
                         <button onClick={() => onMarkPaid(r)} disabled={isPending} className="p-1.5 hover:bg-success/10 rounded text-muted-foreground hover:text-success" title={t.invoice.tipMarkPaid}>
                           <CheckCircle2 className="w-4 h-4" />
                         </button>
                       )}
-                      <button onClick={() => openEdit(r)} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-navy" title={t.invoice.tipEdit}>
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
+                      {r.status !== "cancelled" && (
+                        <button onClick={() => openEdit(r)} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-navy" title={t.invoice.tipEdit}>
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {r.status !== "paid" && r.status !== "cancelled" && (
+                        <button onClick={() => onCancel(r)} disabled={isPending} className="p-1.5 hover:bg-danger-soft rounded text-muted-foreground hover:text-danger" title={t.invoice.tipCancel}>
+                          <Ban className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       <button onClick={() => onDelete(r)} disabled={isPending} className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-destructive" title={t.invoice.tipDelete}>
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>

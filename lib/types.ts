@@ -47,7 +47,7 @@ export type TransactionRow = {
 };
 
 // ---------- invoices ----------
-export type InvoiceStatus = "draft" | "sent" | "paid";
+export type InvoiceStatus = "draft" | "sent" | "paid" | "cancelled";
 
 export type LineItem = {
   desc: string;
@@ -77,6 +77,8 @@ export type InvoiceRow = {
   note: string | null;
   pdf_url: string | null;
   subscription_id: UUID | null;   // set when auto-generated from a subscription cycle (0011)
+  cancelled_at: ISODateTime | null;  // 0012 — voided instead of deleted
+  cancel_reason: string | null;      // why it was voided (shown in the list)
   created_at: ISODateTime;
 };
 
