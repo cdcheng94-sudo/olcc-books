@@ -100,7 +100,7 @@ DRIVE_SETUP_SECRET=<random string>
 
 ## 5. Supabase 数据库 schema
 
-约 11 张表,migration 在 `supabase/migrations/` 已经跑过(**0001–0011**):
+约 11 张表,migration 在 `supabase/migrations/` 已经跑过(**0001–0012**):
 
 | 表 | 用途 | 关键 cascade |
 |---|---|---|
@@ -175,6 +175,16 @@ Outstanding(每股东)= Σshareholder_loan − Σloan_repayment   (股本 capita
 - **Subscriptions 的 discount_percent 是持久的** —— 每期 Mark Paid 自动套用,客户每月账单都看到"原价 → 折扣 X% → 实付"。
 - EduFlow onboard 的 discount_percent **同时**写进首期 invoice **和**月度 subscription(给客户的折扣首期 + 每月都生效)。
 - PDF 总额区显示 `Discount (10%): −MYR X.XX`(红色),客户看得到原价和被折扣的额度。
+
+### 5.1.3 发票作废(`cancelled`,0012)
+
+已开出的发票**不删,作废**。删掉会让 INV 编号出现无法解释的缺口,而且客户手上还有那张 PDF,账上却查无此单。
+
+- `status` 多一个 `cancelled`;`cancelled_at` / `cancel_reason` 记录何时、为何作废(原因显示在列表那一行下面)。
+- `cancelInvoice(id, reason)`:**已付的拒绝作废**(它挂着收据 + income 交易,作废会让真钱悬空;真要撤销先删收据)。
+- 作废的发票不能 Mark Paid、不能寄出、不能编辑 —— 三个 action 都有 guard。
+- **订阅联动:** 若作废的是某期循环发票,会把该订阅的 `last_invoiced_date` 清空,否则 `createCycleInvoice` 的去重会认定「这期开过了」,永远不让你重开一张正确的。
+- 列表:多一个「已作废」页签、红色徽章、整行变淡 + 编号划线;逾期标签不会对作废单显示。
 
 ### 5.2 RLS 策略
 

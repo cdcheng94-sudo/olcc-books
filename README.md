@@ -32,7 +32,7 @@ npm install
 
 # 3. Run database migrations against Supabase
 #    Supabase Dashboard → SQL Editor → run each file under supabase/migrations/
-#    in order (0001 → … → 0011) and click Run.
+#    in order (0001 → … → 0012) and click Run.
 
 # 4. Configure Google OAuth in Supabase
 #    Authentication → Providers → Google → enable + Client ID/Secret.
@@ -90,7 +90,7 @@ lib/
 ├── types.ts                # DB row types
 └── i18n.ts                 # zh/en dictionary
 
-supabase/migrations/        # 0001_init … 0011_subscription_auto_invoice
+supabase/migrations/        # 0001_init … 0012_invoice_cancel
 middleware.ts               # auth redirect (excludes api/cron, api/drive, assets)
 vercel.json                 # Cron config
 ```
@@ -104,6 +104,9 @@ vercel.json                 # Cron config
   through the subscription's own Mark Paid.** The UI hides Mark Paid for those
   rows for exactly this reason; paying the cycle invoice advances the
   subscription. Doing both would bill the cycle twice.
+- **Never delete an issued invoice — cancel it.** A cancelled invoice keeps its
+  number and records why; a deleted one leaves a hole in the INV run and no
+  trace of what the customer was sent. Paid invoices cannot be cancelled.
 - **Marking Recurring/Claim paid writes a real expense Transaction.** Claims
   can optionally cascade a `capital_expense` (Capital Pool) instead.
 - **Capital vs Operating pools must stay separate** (tax correctness):
