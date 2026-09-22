@@ -8,6 +8,7 @@ import { useLang } from "@/components/LangProvider";
 import { interp } from "@/lib/i18n";
 import { fmtDate, fmtMoney } from "@/lib/format";
 import { uploadReceiptToDrive } from "@/lib/upload-receipt";
+import { cn } from "@/lib/utils";
 import type { ClaimRow, ClaimStatus } from "@/lib/types";
 import { deleteClaim, approveClaim } from "./actions";
 import { ClaimFormModal } from "./ClaimFormModal";
@@ -31,6 +32,7 @@ export function ClaimsClient({ initialRows }: { initialRows: ClaimRow[] }) {
   const [payModalOpen, setPayModalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);   // row a file is being dragged over
   const reuploadRef = useRef<HTMLInputElement>(null);
   const reuploadRowRef = useRef<ClaimRow | null>(null);
 
@@ -108,12 +110,15 @@ export function ClaimsClient({ initialRows }: { initialRows: ClaimRow[] }) {
     reuploadRowRef.current = row;
     reuploadRef.current?.click();
   }
-  async function onReuploadFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function onReuploadFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     e.target.value = "";
     const row = reuploadRowRef.current;
     reuploadRowRef.current = null;
-    if (!f || !row) return;
+    if (f && row) void uploadFor(row, f);
+  }
+  // Shared by the 补传 button and drag-and-drop onto the row.
+  async function uploadFor(row: ClaimRow, f: File) {
     setUploadingId(row.id);
     try {
       const res = await uploadReceiptToDrive({
@@ -183,7 +188,12 @@ export function ClaimsClient({ initialRows }: { initialRows: ClaimRow[] }) {
               <tr key={r.id} className="border-t border-border hover:bg-muted/20">
                 <td className="px-4 py-3">{fmtDate(r.date)}</td>
                 <td className="px-4 py-3 font-medium">{r.claimant}</td>
-                <td className="px-4 py-3">
+                <td
+                  className={cn("px-4 py-3 transition-colors", dragOverId === r.id && "bg-gold/10 ring-1 ring-inset ring-gold")}
+                  onDragOver={(e) => { if (r.receipt_url || uploadingId) return; e.preventDefault(); setDragOverId(r.id); }}
+                  onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverId(null); }}
+                  onDrop={(e) => { if (r.receipt_url || uploadingId) return; e.preventDefault(); setDragOverId(null); const f = e.dataTransfer.files?.[0]; if (f) void uploadFor(r, f); }}
+                >
                   <div>{r.item_desc}</div>
                   {r.receipt_url ? (
                     <a href={r.receipt_url} target="_blank" rel="noreferrer" title={t.tx.openInDrive}
@@ -197,7 +207,7 @@ export function ClaimsClient({ initialRows }: { initialRows: ClaimRow[] }) {
                   ) : (
                     <button type="button" onClick={() => pickReupload(r)} title={t.tx.uploadReceipt}
                       className="text-[11px] text-muted-foreground hover:text-navy inline-flex items-center gap-0.5">
-                      <Upload className="w-2.5 h-2.5" />{t.tx.uploadReceipt}
+                      <Upload className="w-2.5 h-2.5" />{dragOverId === r.id ? t.tx.dropToAttach : t.tx.uploadReceipt}
                     </button>
                   )}
                 </td>
@@ -235,7 +245,7 @@ export function ClaimsClient({ initialRows }: { initialRows: ClaimRow[] }) {
       </Card>
 
       {/* hidden input for 补传 (supplemental receipt upload) */}
-      <input ref={reuploadRef} type="file" accept="image/*,application/pdf" capture="environment" onChange={onReuploadFile} className="hidden" />
+      <input ref={reuploadRef} type="file" accept="image/*,application/pdf" onChange={onReuploadFile} className="hidden" />
 
       <ClaimFormModal open={modalOpen} onOpenChange={setModalOpen} editing={editing} onSaved={onSaved} />
       <MarkClaimPaidModal open={payModalOpen} onOpenChange={setPayModalOpen} claim={payingClaim} onPaid={onPaid} />

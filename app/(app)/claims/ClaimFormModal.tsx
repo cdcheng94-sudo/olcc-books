@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FileDrop } from "@/components/ui/file-drop";
 import { useLang } from "@/components/LangProvider";
 import { todayIso } from "@/lib/format";
 import { CLAIM_CATEGORIES } from "@/lib/categories";
@@ -135,12 +136,7 @@ export function ClaimFormModal({ open, onOpenChange, editing, onSaved }: Props) 
           </div>
           <div className="flex flex-col gap-1">
             <Label className="text-xs">{t.claims.formReceipt}</Label>
-            <input
-              type="file"
-              accept="image/*,application/pdf"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="text-sm file:mr-2 file:rounded-md file:border-0 file:bg-navy file:px-2.5 file:py-1.5 file:text-white hover:file:bg-navy-light"
-            />
+            <FileDrop value={file} onChange={setFile} />
             {editing && existingReceiptUrl && !file && (
               <a href={existingReceiptUrl} target="_blank" rel="noreferrer" title={t.tx.openInDrive}
                 className="text-[11px] text-muted-foreground hover:text-navy underline inline-flex items-center gap-0.5 mt-0.5">

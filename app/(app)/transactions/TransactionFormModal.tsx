@@ -8,6 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FileDrop } from "@/components/ui/file-drop";
 import { Textarea } from "@/components/ui/textarea";
 import {
   CATEGORIES, CAPITAL_CATEGORIES, TRANSACTION_TYPES,
@@ -296,7 +297,7 @@ export function TransactionFormModal({
             {showReceipt && (
               <div className="flex flex-col gap-1 col-span-2">
                 <Label className="text-xs">{t.tx.receipt}</Label>
-                <Input type="file" accept="image/*,application/pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+                <FileDrop value={file} onChange={setFile} />
                 {existingReceiptUrl && !file && (
                   <div className="text-xs text-muted-foreground mt-1">
                     {t.tx.currentReceipt}<a href={existingReceiptUrl} target="_blank" rel="noreferrer" className="text-navy underline">{t.tx.viewExisting}</a>{t.tx.replaceHint}

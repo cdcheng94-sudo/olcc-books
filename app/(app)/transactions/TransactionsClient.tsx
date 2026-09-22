@@ -12,6 +12,7 @@ import type { TransactionRow, ShareholderRow } from "@/lib/types";
 import { deleteTransaction } from "./actions";
 import { TransactionFormModal, type TxPrefill } from "./TransactionFormModal";
 import { uploadReceiptToDrive } from "@/lib/upload-receipt";
+import { cn } from "@/lib/utils";
 
 const driveCategoryFor = (ty: TransactionType): "Receipts" | "Capital" =>
   (CAPITAL_TYPES as readonly string[]).includes(ty) ? "Capital" : "Receipts";
@@ -47,6 +48,7 @@ export function TransactionsClient({ initialRows, shareholders: initialSharehold
   const [isPending, startTransition] = useTransition();
   const [scanning, setScanning] = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);   // row a file is being dragged over
   const scanInputRef = useRef<HTMLInputElement>(null);
   const reuploadRef = useRef<HTMLInputElement>(null);
   const reuploadRowRef = useRef<TransactionRow | null>(null);
@@ -140,12 +142,15 @@ export function TransactionsClient({ initialRows, shareholders: initialSharehold
     reuploadRowRef.current = row;
     reuploadRef.current?.click();
   }
-  async function onReuploadFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function onReuploadFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     e.target.value = "";
     const row = reuploadRowRef.current;
     reuploadRowRef.current = null;
-    if (!f || !row) return;
+    if (f && row) void uploadFor(row, f);
+  }
+  // Shared by the 补传 button and drag-and-drop onto the row.
+  async function uploadFor(row: TransactionRow, f: File) {
     setUploadingId(row.id);
     try {
       const party = (row.shareholder_id && shareholderNames[row.shareholder_id]) || row.party || null;
@@ -265,7 +270,12 @@ export function TransactionsClient({ initialRows, shareholders: initialSharehold
                 </td>
                 <td className="px-4 py-3">{partyLabel(r)}</td>
                 <td className="px-4 py-3 text-muted-foreground">{r.note || "—"}</td>
-                <td className="px-4 py-3">
+                <td
+                  className={cn("px-4 py-3 transition-colors", dragOverId === r.id && "bg-gold/10 ring-1 ring-inset ring-gold")}
+                  onDragOver={(e) => { if (r.receipt_url || uploadingId) return; e.preventDefault(); setDragOverId(r.id); }}
+                  onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverId(null); }}
+                  onDrop={(e) => { if (r.receipt_url || uploadingId) return; e.preventDefault(); setDragOverId(null); const f = e.dataTransfer.files?.[0]; if (f) void uploadFor(r, f); }}
+                >
                   {r.receipt_url ? (
                     <a href={r.receipt_url} target="_blank" rel="noreferrer" title={t.tx.openInDrive}
                       className="text-navy hover:text-gold underline">{t.actions.view}</a>
@@ -276,7 +286,7 @@ export function TransactionsClient({ initialRows, shareholders: initialSharehold
                   ) : (
                     <button type="button" onClick={() => pickReupload(r)} title={t.tx.uploadReceipt}
                       className="inline-flex items-center text-muted-foreground hover:text-navy text-xs">
-                      <Upload className="w-3.5 h-3.5 mr-1" />{t.tx.uploadReceipt}
+                      <Upload className="w-3.5 h-3.5 mr-1" />{dragOverId === r.id ? t.tx.dropToAttach : t.tx.uploadReceipt}
                     </button>
                   )}
                 </td>
@@ -295,7 +305,7 @@ export function TransactionsClient({ initialRows, shareholders: initialSharehold
       </Card>
 
       {/* hidden input for 补传 (supplemental receipt upload) */}
-      <input ref={reuploadRef} type="file" accept="image/*,application/pdf" capture="environment" onChange={onReuploadFile} className="hidden" />
+      <input ref={reuploadRef} type="file" accept="image/*,application/pdf" onChange={onReuploadFile} className="hidden" />
 
       <TransactionFormModal
         open={modalOpen}

@@ -7,6 +7,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FileDrop } from "@/components/ui/file-drop";
 import { useLang } from "@/components/LangProvider";
 import { fmtMoney, todayIso } from "@/lib/format";
 import { PAYMENT_METHODS } from "@/lib/categories";
@@ -107,12 +108,7 @@ export function MarkPaidModal({ open, onOpenChange, invoice, onPaid }: Props) {
             {/* optional payment proof */}
             <div className="flex flex-col gap-1">
               <Label className="text-xs">{t.invoice.markPaidProof}</Label>
-              <input
-                type="file"
-                accept="image/*,application/pdf"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                className="text-sm file:mr-3 file:rounded-md file:border-0 file:bg-navy file:px-3 file:py-1.5 file:text-white hover:file:bg-navy-light"
-              />
+              <FileDrop value={file} onChange={setFile} disabled={busy} />
               <p className="text-[11px] text-muted-foreground italic">{t.invoice.markPaidProofHint}</p>
             </div>
           </div>
