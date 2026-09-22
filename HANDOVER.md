@@ -100,7 +100,7 @@ DRIVE_SETUP_SECRET=<random string>
 
 ## 5. Supabase 数据库 schema
 
-约 11 张表,migration 在 `supabase/migrations/` 已经跑过(**0001–0012**):
+约 11 张表,migration 在 `supabase/migrations/` 已经跑过(**0001–0013**):
 
 | 表 | 用途 | 关键 cascade |
 |---|---|---|
@@ -109,7 +109,7 @@ DRIVE_SETUP_SECRET=<random string>
 | `shareholders` | 股东(资本池主体,0007 新增) | — |
 | `transactions` | 总账,**7 种 type**(见 §5.2) | 被 receipts/claims/recurring 级联写入 |
 | `invoices` | 开给客户的发票 | Mark Paid → 触发 createReceipt(+ 可附客户付款凭证到 Drive);**0011 加 `subscription_id` FK —— 有值时 Mark Paid 还会推进那张订阅** |
-| `receipts` | 收据(自动 + 手动) | insert → 自动写一行 income transactions |
+| `receipts` | 收据(自动 + 手动) | insert → 自动写一行 income transactions;**0013 加 `emailed_at` / `email_count`(✉ 成功后才盖章,可重发)** |
 | `recurring` | 我们付的月费 | Mark Paid → 写一行 expense transactions |
 | `subscriptions` | 客户付我们的月费 | Mark Paid → 经 Receipt 级联 → income;**0010 加 next_checkin_date / checkin_interval_days / health(客户关怀)**;**0011 加 `auto_invoice` / `last_invoiced_date`(每期自动开发票,见 §5.1.2)** |
 | `claims` | 员工报销 | markPaid → expense 或 capital_expense;receipt_url 指 Drive |

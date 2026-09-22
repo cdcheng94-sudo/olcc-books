@@ -32,7 +32,7 @@ npm install
 
 # 3. Run database migrations against Supabase
 #    Supabase Dashboard → SQL Editor → run each file under supabase/migrations/
-#    in order (0001 → … → 0012) and click Run.
+#    in order (0001 → … → 0013) and click Run.
 
 # 4. Configure Google OAuth in Supabase
 #    Authentication → Providers → Google → enable + Client ID/Secret.
@@ -72,7 +72,7 @@ app/
 │   └── drive/                  # Google Drive upload + OAuth setup-token/callback
 └── manifest.ts             # PWA manifest (home-screen icon)
 
-components/                 # Sidebar, TopBar, LangProvider, charts/, ui/
+components/                 # Sidebar, TopBar, LangProvider, charts/, ui/ (incl. FileDrop drag-and-drop)
 lib/
 ├── supabase/               # browser + server clients
 ├── queries/                # server SELECT helpers (transactions, capital, care, …)
@@ -90,7 +90,7 @@ lib/
 ├── types.ts                # DB row types
 └── i18n.ts                 # zh/en dictionary
 
-supabase/migrations/        # 0001_init … 0012_invoice_cancel
+supabase/migrations/        # 0001_init … 0013_receipt_emailed
 middleware.ts               # auth redirect (excludes api/cron, api/drive, assets)
 vercel.json                 # Cron config
 ```
