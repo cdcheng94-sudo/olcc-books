@@ -341,6 +341,10 @@ export const T = {
       tipDelete:       "删除",
       confirmDelete:   "删除收据 {number}?关联的收入交易也会被删除。此操作无法撤销。",
       confirmEmail:    "把收据 {number} 发到 {email}?",
+      confirmResend:   "收据 {number} 已于 {date} 发过。再发一次到 {email}?",
+      tipResend:       "再次发送",
+      emailedAt:       "已发送 {date}",
+      emailedTimes:    "已发送 {date} · 共 {n} 次",
     },
     recurring: {
       title:           "定期付款(我们付)",
@@ -928,6 +932,10 @@ export const T = {
       tipDelete:       "Delete",
       confirmDelete:   "Delete receipt {number}? The linked income transaction will also be removed. This cannot be undone.",
       confirmEmail:    "Email receipt {number} to {email}?",
+      confirmResend:   "Receipt {number} was already emailed on {date}. Send it again to {email}?",
+      tipResend:       "Send again",
+      emailedAt:       "Sent {date}",
+      emailedTimes:    "Sent {date} · {n}×",
     },
     recurring: {
       title:           "Recurring (we pay outwards)",

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, FileDown, Send, Trash2 } from "lucide-react";
+import { Plus, FileDown, Send, Trash2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useLang } from "@/components/LangProvider";
@@ -44,10 +44,17 @@ export function ReceiptsClient({ initialRows }: { initialRows: ReceiptRow[] }) {
 
   function onEmail(row: ReceiptRow) {
     if (!row.customer_email) { alert(t.common.noEmail); return; }
-    if (!confirm(interp(t.receipt.confirmEmail, { number: row.receipt_number, email: row.customer_email }))) return;
+    // Already went out once? Say so before sending a duplicate.
+    const msg = row.emailed_at
+      ? interp(t.receipt.confirmResend, { number: row.receipt_number, email: row.customer_email, date: fmtDate(row.emailed_at) })
+      : interp(t.receipt.confirmEmail,  { number: row.receipt_number, email: row.customer_email });
+    if (!confirm(msg)) return;
     startTransition(async () => {
-      try { await emailReceipt(row.id); alert(t.invoice.sentOk); }
-      catch (e) { alert(t.errors.sendFailed + (e as Error).message); }
+      try {
+        const saved = await emailReceipt(row.id);
+        setRows((prev) => prev.map((r) => r.id === saved.id ? saved : r));
+        alert(t.invoice.sentOk);
+      } catch (e) { alert(t.errors.sendFailed + (e as Error).message); }
     });
   }
 
@@ -84,6 +91,14 @@ export function ReceiptsClient({ initialRows }: { initialRows: ReceiptRow[] }) {
                 <td className="px-4 py-3">
                   <div className="font-medium">{r.customer_name}</div>
                   {r.customer_email && <div className="text-xs text-muted-foreground">{r.customer_email}</div>}
+                  {r.emailed_at && (
+                    <div className="text-[11px] text-success inline-flex items-center gap-1 mt-0.5">
+                      <CheckCircle2 className="w-3 h-3" />
+                      {r.email_count > 1
+                        ? interp(t.receipt.emailedTimes, { date: fmtDate(r.emailed_at), n: r.email_count })
+                        : interp(t.receipt.emailedAt,    { date: fmtDate(r.emailed_at) })}
+                    </div>
+                  )}
                 </td>
                 <td className="px-4 py-3">{fmtDate(r.date)}</td>
                 <td className="px-4 py-3 text-right tabular-nums font-semibold text-success">{fmtMoney(r.total)}</td>
@@ -94,7 +109,9 @@ export function ReceiptsClient({ initialRows }: { initialRows: ReceiptRow[] }) {
                       <FileDown className="w-4 h-4" />
                     </button>
                     {r.customer_email && (
-                      <button onClick={() => onEmail(r)} disabled={isPending} className="p-1.5 hover:bg-warning-soft rounded text-muted-foreground hover:text-warning" title={t.receipt.tipEmail}>
+                      <button onClick={() => onEmail(r)} disabled={isPending}
+                        className={"p-1.5 rounded hover:bg-warning-soft hover:text-warning " + (r.emailed_at ? "text-success" : "text-muted-foreground")}
+                        title={r.emailed_at ? t.receipt.tipResend : t.receipt.tipEmail}>
                         <Send className="w-4 h-4" />
                       </button>
                     )}

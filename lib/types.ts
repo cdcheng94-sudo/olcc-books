@@ -98,6 +98,8 @@ export type ReceiptRow = {
   payment_method: string;
   linked_invoice_id: UUID | null;
   pdf_url: string | null;
+  emailed_at: ISODateTime | null;  // 0013 — last time ✉ was clicked; null = never sent
+  email_count: number;             // how many times it has gone out (re-sending is allowed)
   created_at: ISODateTime;
 };
 

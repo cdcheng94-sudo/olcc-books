@@ -147,7 +147,7 @@ export async function getReceiptDownloadUrl(id: string): Promise<string> {
   return await generateReceiptPdf(id);
 }
 
-export async function emailReceipt(id: string): Promise<{ ok: true }> {
+export async function emailReceipt(id: string): Promise<ReceiptRow> {
   const supabase = await createClient();
   const { data: receipt, error } = await supabase.from("receipts").select("*").eq("id", id).single();
   if (error) throw new Error(error.message);
@@ -165,5 +165,15 @@ export async function emailReceipt(id: string): Promise<{ ok: true }> {
     amount:        fmtMoney(r.total, settings.currency),
     pdfUrl,
   });
-  return { ok: true };
+
+  // Stamp only after Resend accepted it, so a failed send never looks sent.
+  const { data: stamped, error: stampErr } = await supabase
+    .from("receipts")
+    .update({ emailed_at: new Date().toISOString(), email_count: (r.email_count ?? 0) + 1 })
+    .eq("id", id)
+    .select()
+    .single();
+  if (stampErr) throw new Error(stampErr.message);
+  revalidatePath("/receipts");
+  return stamped as ReceiptRow;
 }
