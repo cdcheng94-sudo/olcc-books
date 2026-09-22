@@ -173,9 +173,22 @@ export async function cancelInvoice(id: string, reason: string): Promise<Invoice
     .single();
   if (upErr) throw new Error(upErr.message);
 
+  // Only release the cycle stamp if this was the subscription's latest live
+  // invoice. If a newer one already exists (e.g. the plan changed and a fresh
+  // invoice was issued before voiding the old one), that newer invoice owns
+  // the current cycle — clearing the stamp would make the cron issue a
+  // duplicate the next morning.
   if (inv.subscription_id) {
-    await supabase.from("subscriptions").update({ last_invoiced_date: null }).eq("id", inv.subscription_id);
-    revalidatePath("/subscriptions");
+    const { count } = await supabase
+      .from("invoices")
+      .select("id", { count: "exact", head: true })
+      .eq("subscription_id", inv.subscription_id)
+      .neq("status", "cancelled")
+      .gt("created_at", inv.created_at);
+    if ((count ?? 0) === 0) {
+      await supabase.from("subscriptions").update({ last_invoiced_date: null }).eq("id", inv.subscription_id);
+      revalidatePath("/subscriptions");
+    }
   }
 
   revalidatePath("/invoices");
