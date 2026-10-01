@@ -13,11 +13,13 @@ const LOGO_URL = "https://raw.githubusercontent.com/cdcheng94-sudo/olcc-assets-c
 
 const TITLE_KEYS: Record<string, keyof Dict["nav"]> = {
   "/dashboard":     "dashboard",
+  "/pnl":           "pnl",
   "/transactions":  "transactions",
   "/invoices":      "invoices",
   "/receipts":      "receipts",
   "/recurring":     "recurring",
   "/subscriptions": "subscriptions",
+  "/care":          "care",
   "/eduflow":       "eduflow",
   "/capital":       "capital",
   "/claims":        "claims",

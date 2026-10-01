@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
+  Scale,
   ArrowLeftRight,
   FileText,
   ReceiptText,
@@ -23,6 +24,7 @@ const LOGO_URL = "https://raw.githubusercontent.com/cdcheng94-sudo/olcc-assets-c
 
 const NAV: { href: string; key: keyof Dict["nav"]; Icon: React.ComponentType<{ size?: number }>; gold?: boolean }[] = [
   { href: "/dashboard",     key: "dashboard",     Icon: LayoutDashboard },
+  { href: "/pnl",           key: "pnl",           Icon: Scale },
   { href: "/transactions",  key: "transactions",  Icon: ArrowLeftRight },
   { href: "/invoices",      key: "invoices",      Icon: FileText },
   { href: "/receipts",      key: "receipts",      Icon: ReceiptText },
