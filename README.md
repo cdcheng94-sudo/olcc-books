@@ -52,6 +52,7 @@ app/
 ├── (app)/                  # Authenticated app shell (sidebar + topbar)
 │   ├── layout.tsx          # Shell + whitelist gate
 │   ├── dashboard/          # 3-col reminder grid, total-funds hero, charts
+│   ├── pnl/                # Profit & loss by month, any range (read-only, CSV export)
 │   ├── transactions/       # Ledger (7 types) + OCR scan + Drive receipt upload
 │   ├── invoices/           # CRUD + PDF + email + Mark-Paid dialog
 │   ├── receipts/           # Auto (from invoice/subscription) + manual

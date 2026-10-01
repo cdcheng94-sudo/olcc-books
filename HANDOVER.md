@@ -368,7 +368,7 @@ middleware 的 matcher 排除 `api/cron`(也排除 `api/drive`),否则 Supabase 
 | 自动发 receipt 邮件给客户(mark paid 后要手动点 ✉) | 没做 | 中 |
 | 利息自动计算(interest_rate 存了但靠手动录) | 没做 | 中 |
 | 资本性支出超支护栏(Capital Pool 可被花成负) | 没做 | 低 |
-| 月度 / 年度 P&L 报表 + 数据导出 CSV/Excel | 没做 | 中(会计需要) |
+| ~~月度 / 年度 P&L 报表~~ | ✅ 已做:`/pnl`(`lib/queries/pnl.ts`),任意月份区间 + CSV 导出。口径与 Dashboard 一致(income − expense − interest_paid,现金制) | — |
 | 操作日志 / audit log | 没做 | 中(合规) |
 | `middleware.ts` deprecation → Next 16 `proxy.ts` | deprecation warning,不影响功能 | 低 |
 | Mark Paid invoice 后 PDF 仍显示 DRAFT(pdf_url cache) | 已知小 bug | 低 |

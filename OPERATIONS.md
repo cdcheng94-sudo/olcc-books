@@ -387,7 +387,7 @@ curl.exe -H "Authorization: Bearer <CRON_SECRET>" https://olcc-books.vercel.app/
 那个客户开了「每期自动开发票」。**去 `/invoices` 付那张发票**就行,系统会顺带推进订阅。见 §4。
 
 ### "想看具体某天/某月报表"
-还没建,在 backlog。现在可以用 `/transactions` 筛选 + Dashboard 看。
+左侧栏 **损益表 (P&L)** → 选期间(今年 / 去年 / 近 12 个月 / 全部,或自己选起迄月份)→ 按月看收入、支出、净利润。右上 **CSV** 可以导出给会计师。数字全部来自 `/transactions`,那边记了这边就有;股东借款/股本不算在内。
 
 ---
 

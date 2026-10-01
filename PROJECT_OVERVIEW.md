@@ -275,7 +275,7 @@ Operating Pool = 收入 − 支出 − 付利息
 | **Subscription 自动收款** | 到期手动点 Mark Paid(客户真转账后才点)。auto-invoice 只自动**开票**,收钱仍靠人手确认 | 要不要接 Stripe?门槛:Stripe MY 商户号 + EduFlow 网站 Checkout |
 | **自动发 receipt 邮件** | Mark Paid 生成 receipt 但要手动点 ✉ 才发 | 要不要 Mark Paid 后自动邮收据? |
 | **自动发 invoice 邮件** | auto-invoice 开出来是 **draft**,还要人去 `/invoices` 点 ✉ | 要不要开完直接发?(风险:金额错了已经发出去了) |
-| **月度/年度 P&L 报表** | 没做 | 会计需要 |
+| ~~月度/年度 P&L 报表~~ | ✅ `/pnl` 已上线(任意区间、按月分栏、CSV) | 现金制;要权责制(年费分摊)再议 |
 | **数据导出 CSV/Excel** | 没做 | 给会计师 |
 | **操作日志 audit log** | 没做 | 合规 / 多人协作追溯 |
 | **多公司 / 白标** | 只 OLCC 一家 | 若将来卖给别人用 |
